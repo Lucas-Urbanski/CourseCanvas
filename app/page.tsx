@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Settings, BookOpen } from "lucide-react";
 import CourseCard from "./components/courseCard";
-import SignInPage from "./login/page";
+import SignInPage from "./login/sign-in";
 
 export default function Home() {
   const isTeacher: boolean = true;
