@@ -12,7 +12,7 @@ export default function Home() {
       <header className="bg-[#D9D2C3] border-b border-black/10 px-8 py-4 flex items-center justify-between">
         {/* Logo & Home Link */}
         <Link
-          href="/login/page"
+          href="/login"
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <div className="w-8 h-8 bg-zinc-800 rounded flex items-center justify-center text-[#F5F1E6]">
