@@ -1,12 +1,19 @@
 "use client";
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Settings() {
   // Initialize Supabase client once using useMemo
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(
+    () =>
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      ),
+    [],
+  );
   const router = useRouter();
 
   // Store authenticated user and loading state
@@ -104,6 +111,7 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-[#F5F1E6] p-8 flex flex-col items-center">
       <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-sm">
+        
         {/* Avatar Section */}
         <div className="flex flex-col items-center mb-6">
           <button
