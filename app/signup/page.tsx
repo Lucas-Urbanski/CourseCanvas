@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { BookOpen, UserPlus } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +21,7 @@ export default function SignUpPage() {
       setError("Please fill in all fields.");
       return;
     }
-
+    router.push("/home");
     console.log("Sign up submitted:", { fullName, email, password, role });
   };
 

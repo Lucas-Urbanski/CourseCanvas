@@ -21,7 +21,7 @@ export default function SignInPage() {
       return;
     }
 
-    router.push("/course");
+    router.push("/home");
   };
 
   return (
