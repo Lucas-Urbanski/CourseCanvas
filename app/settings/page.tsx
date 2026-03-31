@@ -1,35 +1,30 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
-import { useEffect, useState, useMemo } from "react";
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BookOpen, LogOut, Save, Camera } from "lucide-react";
+import { createBrowserClient } from "@supabase/ssr";
+
+  // Using the newer SSR client to match your SignUp page
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
 
 export default function Settings() {
-  // Initialize Supabase client once using useMemo
-  const supabase = useMemo(
-    () =>
-      createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      ),
-    [],
-  );
   const router = useRouter();
-
-  // Store authenticated user and loading state
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  // Form state for profile and password fields
-  const [username, setUsername] = useState("");
-  const [newUsername, setNewUsername] = useState("");
+  // Form state - matched exactly to your SQL column names
+  const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
-    // Fetch user and profile data on component mount
     const getData = async () => {
       const {
         data: { user },
@@ -38,25 +33,22 @@ export default function Settings() {
       if (user) {
         setUser(user);
 
-        // Fetch profile data from "profiles" table
+        // Matching your SQL: fullName, bio, avatarUrl
         const { data: profile } = await supabase
           .from("profiles")
-          .select("username, bio, avatar_url")
+          .select("fullName, bio, avatarUrl")
           .eq("id", user.id)
           .single();
 
         if (profile) {
-          // Populate form fields with existing profile data
-          setUsername(profile.username || "");
-          setNewUsername(profile.username || "");
+          setFullName(profile.fullName || "");
           setBio(profile.bio || "");
-          setAvatarUrl(profile.avatar_url || "");
+          setAvatarUrl(profile.avatarUrl || "");
         }
-      } else {
-        // Redirect to home if no user is logged in
-        router.push("/");
-      }
-
+      } 
+      // else {
+      //   router.push("/signin");
+      // }
       setLoading(false);
     };
 
@@ -64,22 +56,34 @@ export default function Settings() {
   }, [supabase, router]);
 
   async function saveProfile() {
-    // Handle password update if user entered a new one
-    if (newPassword && newPassword !== confirmPassword) {
+    if (newPassword && newPassword.length < 6) {
+      alert("New password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
       alert("Passwords do not match!");
       return;
     }
 
+    setLoading(true);
+
+    // Update Database Profile
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ username: newUsername, bio, avatar_url: avatarUrl })
+      .update({
+        fullName: fullName,
+        bio: bio,
+        avatarUrl: avatarUrl,
+      })
       .eq("id", user.id);
 
     if (profileError) {
       alert(profileError.message);
+      setLoading(false);
       return;
     }
 
+    // Update Auth Password if provided
     if (newPassword) {
       const { error: authError } = await supabase.auth.updateUser({
         password: newPassword,
@@ -87,125 +91,132 @@ export default function Settings() {
 
       if (authError) {
         alert("Password error: " + authError.message);
+        setLoading(false);
         return;
       }
-
-      // Clear password fields after successful update
       setNewPassword("");
       setConfirmPassword("");
     }
 
-    // Update displayed username and notify user
-    setUsername(newUsername);
     alert("Profile updated successfully!");
+    setLoading(false);
   }
 
   async function logout() {
-    // Sign out user and redirect to home page
     await supabase.auth.signOut();
-    router.push("/");
+    router.push("/signin");
   }
 
-  if (loading) return <div className="p-10 text-center">Loading...</div>;
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F1E6]">
+        Loading settings...
+      </div>
+    );
 
   return (
-    <div className="min-h-screen bg-[#F5F1E6] p-8 flex flex-col items-center">
-      <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-sm">
-        
-        {/* Avatar Section */}
-        <div className="flex flex-col items-center mb-6">
-          <button
-            onClick={() =>
-              setAvatarUrl(`https://i.pravatar.cc/300?u=${user?.id}`)
-            }
-            className="relative w-24 h-24 mb-4 rounded-full overflow-hidden border-4 border-white shadow-md hover:opacity-80 transition"
-          >
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-blue-500 flex items-center justify-center text-white text-2xl font-bold">
-                {username ? username.slice(0, 2).toUpperCase() : "??"}
-              </div>
-            )}
-          </button>
-
-          <h1 className="text-2xl font-bold text-gray-800">
-            {username || "New User"}
-          </h1>
+    <main className="min-h-screen bg-[#F5F1E6] px-6 py-12">
+      <div className="mx-auto max-w-md rounded-3xl border border-zinc-300 bg-white/80 p-8 shadow-lg">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800 text-[#F5F1E6]">
+            <BookOpen size={28} />
+          </div>
+          <h1 className="text-2xl font-bold text-zinc-800">Account Settings</h1>
         </div>
 
-        {/* Form Section */}
-        <div className="space-y-4">
+        {/* Avatar Section */}
+        <div className="mb-8 flex flex-col items-center">
+          <div className="relative group">
+            <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-zinc-200 shadow-md">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-zinc-500">
+                  {fullName ? fullName.substring(0, 2).toUpperCase() : "UC"}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() =>
+                setAvatarUrl(
+                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`,
+                )
+              }
+              className="absolute bottom-0 right-0 rounded-full bg-zinc-800 p-2 text-white shadow-lg hover:scale-110 transition"
+            >
+              <Camera size={16} />
+            </button>
+          </div>
+          <p className="mt-2 text-sm font-cursive text-zinc-600">{fullName}</p>
+        </div>
+
+        {/* Inputs */}
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username
+            <label className="mb-2 block text-sm font-medium text-zinc-700">
+              Full Name
             </label>
             <input
-              className="w-full border border-gray-300 rounded-lg py-2 px-4 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none focus:border-zinc-800"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
             />
           </div>
 
-          {/* Bio Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-2 block text-sm font-medium text-zinc-700">
               Bio
             </label>
             <textarea
-              className="w-full border border-gray-300 rounded-lg py-2 px-4 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none focus:border-zinc-800"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               rows={3}
             />
           </div>
 
-          {/* Password Section */}
-          <div className="pt-4 border-t border-gray-100">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              New Password (Leave blank to keep current)
+          <div className="pt-4 border-t border-zinc-200">
+            <label className="mb-2 block text-sm font-medium text-zinc-700 text-zinc-400">
+              Change Password
             </label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded-lg py-2 px-4 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="New password"
+              className="mb-3 w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none focus:border-zinc-800"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm New Password
-            </label>
             <input
               type="password"
-              className="w-full border border-gray-300 rounded-lg py-2 px-4 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Confirm new password"
+              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none focus:border-zinc-800"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
 
-          {/* Save & Logout */}
           <button
             onClick={saveProfile}
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] hover:opacity-90 transition"
           >
+            <Save size={18} />
             Save Changes
           </button>
 
           <button
             onClick={logout}
-            className="w-full bg-gray-100 text-red-500 font-bold py-3 rounded-lg hover:bg-red-50 transition"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-3 font-semibold text-red-600 hover:bg-red-50 transition"
           >
+            <LogOut size={18} />
             Logout
           </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

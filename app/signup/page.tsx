@@ -4,6 +4,12 @@ import Link from "next/link";
 import { BookOpen, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -12,17 +18,43 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("student");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
+      setLoading(false);
       return;
     }
-    router.push("/home");
-    console.log("Sign up submitted:", { fullName, email, password, role });
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            fullName: fullName,
+            role: role,
+          },
+        },
+      });
+      if (error) throw error;
+      router.push("/home");
+    } catch (error) {
+      console.error("Error signing up:", error);
+      setError("Failed to create account.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,7 +72,10 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="fullName"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Full Name
             </label>
             <input
@@ -54,7 +89,10 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Email
             </label>
             <input
@@ -68,7 +106,10 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Password
             </label>
             <input
@@ -82,7 +123,10 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="role" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="role"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Role
             </label>
             <select
@@ -104,16 +148,20 @@ export default function SignUpPage() {
 
           <button
             type="submit"
+            disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
           >
             <UserPlus size={18} />
-            Create Account
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Already have an account?{" "}
-          <Link href="/signin" className="font-semibold text-zinc-800 hover:underline">
+          <Link
+            href="/signin"
+            className="font-semibold text-zinc-800 hover:underline"
+          >
             Sign in
           </Link>
         </p>
