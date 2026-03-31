@@ -59,17 +59,6 @@ function HomeContent() {
         </div>
       </header>
 
-      {isTeacher && (
-        <div className="mt-6 flex items-center justify-center">
-          <Link
-            href="/courseCreation"
-            className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
-          >
-            Create Course
-          </Link>
-        </div>
-      )}
-
       <main className="p-10">
         {!user ? (
           <div className="mt-20 text-center">
@@ -83,48 +72,63 @@ function HomeContent() {
               Go to Sign In
             </Link>
           </div>
-        ) : isTeacher ? (
-          <CourseCard
-            courses={[
-              {
-                id: "CS101",
-                name: "Intro to Computer Science",
-                description:
-                  "Learn the fundamentals of computer science and programming.",
-                teacher: "Dr. Smith",
-                startDate: "2027-09-01",
-              },
-              {
-                id: "WD202",
-                name: "Intro to Web Development",
-                description:
-                  "A comprehensive course on modern web development.",
-                teacher: "Ms. Johnson",
-                startDate: "2027-10-15",
-              },
-              {
-                id: "DS303",
-                name: "Data Structures and Algorithms",
-                description:
-                  "Explore advanced data structures and algorithmic approaches.",
-                teacher: "Prof. Williams",
-                startDate: "2027-11-01",
-              },
-            ]}
-          />
         ) : (
-          <CourseCard
-            courses={[
-              {
-                id: "WD202",
-                name: "Intro to Web Development",
-                description:
-                  "A comprehensive course on modern web development.",
-                teacher: "Ms. Johnson",
-                startDate: "2027-10-15",
-              },
-            ]}
-          />
+          <>
+            {isTeacher && (
+              <div className="mt-6 flex items-center justify-center">
+                <Link
+                  href="/courseCreation"
+                  className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+                >
+                  Create Course
+                </Link>
+              </div>
+            )}
+
+            <div className="mt-8">
+              <CourseCard
+                courses={
+                  isTeacher
+                    ? [
+                        {
+                          id: "CS101",
+                          name: "Intro to Computer Science",
+                          description:
+                            "Learn the fundamentals of computer science and programming.",
+                          teacher: "Dr. Smith",
+                          startDate: "2027-09-01",
+                        },
+                        {
+                          id: "WD202",
+                          name: "Intro to Web Development",
+                          description:
+                            "A comprehensive course on modern web development.",
+                          teacher: "Ms. Johnson",
+                          startDate: "2027-10-15",
+                        },
+                        {
+                          id: "DS303",
+                          name: "Data Structures and Algorithms",
+                          description:
+                            "Explore advanced data structures and algorithmic approaches.",
+                          teacher: "Prof. Williams",
+                          startDate: "2027-11-01",
+                        },
+                      ]
+                    : [
+                        {
+                          id: "WD202",
+                          name: "Intro to Web Development",
+                          description:
+                            "A comprehensive course on modern web development.",
+                          teacher: "Ms. Johnson",
+                          startDate: "2027-10-15",
+                        },
+                      ]
+                }
+              />
+            </div>
+          </>
         )}
       </main>
     </div>

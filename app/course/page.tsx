@@ -18,7 +18,8 @@ function CourseContent() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const isTeacher = true;
+  const isTeacher = user?.role === "instructor";
+
   const course = {
     name: "Introduction to Web Development",
     teacher: "Prof. Sarah Johnson",
@@ -30,10 +31,12 @@ function CourseContent() {
   return (
     <main className="min-h-screen bg-[#F5F1E6] px-6 py-12">
       <div className="mx-auto max-w-5xl space-y-8">
-        <div className="flex items-center justify-between rounded-3xl border border-zinc-300 bg-white p-6 shadow-lg">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-zinc-300 bg-white p-6 shadow-lg">
           <div>
             <p className="text-sm font-medium text-zinc-500">CourseCanvas</p>
-            <h1 className="mt-2 text-3xl font-bold text-zinc-800">Course Page</h1>
+            <h1 className="mt-2 text-3xl font-bold text-zinc-800">
+              Course Page
+            </h1>
             <p className="mt-1 text-sm text-zinc-600">
               Signed in as {user?.name} ({user?.role})
             </p>
@@ -42,7 +45,7 @@ function CourseContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/home")}
-              className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90"
+              className="rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90"
             >
               ← Back to Home
             </button>
@@ -91,7 +94,7 @@ function CourseContent() {
           </div>
         </section>
 
-        {user?.role === "instructor" ? (
+        {isTeacher ? (
           <section className="rounded-3xl border border-zinc-300 bg-white p-8 shadow-lg">
             <div className="mb-6 flex items-center gap-2 text-zinc-700">
               <Users size={20} />
@@ -115,7 +118,8 @@ function CourseContent() {
           <section className="rounded-3xl border border-zinc-300 bg-white p-8 shadow-lg">
             <h2 className="text-xl font-bold text-zinc-800">Student View</h2>
             <p className="mt-3 text-zinc-600">
-              You are signed in as a student. Instructor-only controls are hidden.
+              You are signed in as a student. Instructor-only controls are
+              hidden.
             </p>
           </section>
         )}
