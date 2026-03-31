@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 
 export default function AuthGuard({
@@ -11,12 +11,13 @@ export default function AuthGuard({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/signin");
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, pathname]);
 
   if (loading) {
     return (

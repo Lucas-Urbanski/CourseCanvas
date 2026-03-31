@@ -4,10 +4,12 @@ import Link from "next/link";
 import { BookOpen, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
+
 
 export default function SignInPage() {
   const router = useRouter();
+  const supabase = createClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,6 +40,7 @@ export default function SignInPage() {
     }
 
     router.replace("/home");
+    router.refresh();
   };
 
   return (

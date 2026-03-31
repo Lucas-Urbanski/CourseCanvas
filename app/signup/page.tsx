@@ -1,43 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, UserPlus } from "lucide-react";
+import { BookOpen, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase";
 
-export default function SignUpPage() {
+export default function SignInPage() {
   const router = useRouter();
+  const supabase = createClient();
 
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"student" | "instructor">("student");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
-    setMessage("");
 
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setError("Please fill in all fields.");
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter your email and password.");
       return;
     }
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName,
-          role,
-        },
-      },
     });
 
     setLoading(false);
@@ -47,8 +38,8 @@ export default function SignUpPage() {
       return;
     }
 
-    setMessage("Account created successfully.");
-    router.push("/home");
+    router.replace("/home");
+    router.refresh();
   };
 
   return (
@@ -58,27 +49,13 @@ export default function SignUpPage() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800 text-[#F5F1E6]">
             <BookOpen size={28} />
           </div>
-          <h1 className="text-3xl font-bold text-zinc-800">Sign Up</h1>
+          <h1 className="text-3xl font-bold text-zinc-800">Sign In</h1>
           <p className="mt-2 text-sm text-zinc-600">
-            Create your CourseCanvas account.
+            Welcome back to CourseCanvas.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-zinc-700">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              placeholder="Enter your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
-            />
-          </div>
-
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
               Email
@@ -100,26 +77,11 @@ export default function SignUpPage() {
             <input
               id="password"
               type="password"
-              placeholder="Create a password"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
             />
-          </div>
-
-          <div>
-            <label htmlFor="role" className="mb-2 block text-sm font-medium text-zinc-700">
-              Role
-            </label>
-            <select
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as "student" | "instructor")}
-              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
-            >
-              <option value="student">Student</option>
-              <option value="instructor">Instructor</option>
-            </select>
           </div>
 
           {error && (
@@ -128,26 +90,20 @@ export default function SignUpPage() {
             </p>
           )}
 
-          {message && (
-            <p className="rounded-xl bg-green-100 px-4 py-3 text-sm text-green-700">
-              {message}
-            </p>
-          )}
-
           <button
             type="submit"
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90 disabled:opacity-60"
           >
-            <UserPlus size={18} />
-            {loading ? "Creating..." : "Create Account"}
+            <LogIn size={18} />
+            {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Already have an account?{" "}
-          <Link href="/signin" className="font-semibold text-zinc-800 hover:underline">
-            Sign in
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-semibold text-zinc-800 hover:underline">
+            Sign up
           </Link>
         </p>
       </div>
