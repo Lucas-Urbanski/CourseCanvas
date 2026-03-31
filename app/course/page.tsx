@@ -22,6 +22,7 @@ function CourseContent() {
     router.replace("/signin");
   };
 
+  const isTeacher = true;
   const course = {
     name: "Introduction to Web Development",
     teacher: "Prof. Sarah Johnson",
@@ -47,6 +48,14 @@ function CourseContent() {
             className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90">
             ← Back to Home
           </button>
+          {isTeacher && (
+            <Link
+              href="/quizCreation"
+              className="rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90"
+            >
+              Create Quiz
+            </Link>
+          )}
         </div>
 
         <section className="rounded-3xl border border-zinc-300 bg-white p-8 shadow-lg">
@@ -55,7 +64,9 @@ function CourseContent() {
               <BookOpen size={24} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-zinc-800">{course.name}</h2>
+              <h2 className="text-2xl font-bold text-zinc-800">
+                {course.name}
+              </h2>
               <p className="text-zinc-600">Course overview and details</p>
             </div>
           </div>
@@ -86,6 +97,13 @@ function CourseContent() {
               <Users size={20} />
               <h2 className="text-xl font-bold text-zinc-800">Enrolled Students</h2>
             </div>
+        <section className="rounded-3xl border border-zinc-300 bg-white p-8 shadow-lg">
+          <div className="mb-6 flex items-center gap-2 text-zinc-700">
+            <Users size={20} />
+            <h2 className="text-xl font-bold text-zinc-800">
+              Enrolled Students
+            </h2>
+          </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               {course.students.map((student, index) => (
