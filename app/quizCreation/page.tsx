@@ -44,7 +44,7 @@ export default function QuizCreation() {
   }}
   
   return (
-    <div className="min-h-screen font-sans bg-[#F5F1E6]">
+    <div className="flex flex-col min-h-screen bg-[#F5F1E6]">
       <header className="bg-[#D9D2C3] border-b border-black/10 px-8 py-4 flex items-center justify-between">
         <Link
           href="/home"
@@ -56,7 +56,7 @@ export default function QuizCreation() {
           <span className="font-bold text-zinc-800 text-lg">CourseCanvas</span>
         </Link>
 
-        <div className="flex-1 max-w-md px-4 text-center">
+        <div className="flex-1 max-w-md mr-16 px-4 text-center">
           <h1 className="font-bold text-zinc-800 text-lg">Quiz Creation</h1>
         </div>
 
@@ -73,22 +73,24 @@ export default function QuizCreation() {
           </Link>
         </div>
       </header>
-      <main className="flex flex-col bg-[#D9D2C3] min-h-screen w-1/3 m-10 rounded-sm mx-auto items-center">
-        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-5 m-5">
-            <h1 className="pr-6">Enter Number of Questions in quiz</h1>
+      <main className="flex flex-col bg-[#D9D2C3] min-h-screen w-1/3 m-10 rounded-sm mx-auto items-center text-zinc-500">
+        <div className="flex flex-col bg-[#F5F1E6] rounded-sm p-5 m-5 gap-2">
+            <h1 className="pr-6">Enter Number of Questions in The Quiz</h1>
             <input type="number" value={numberOfQuestions} className="text-right border pl-6"
             onChange={(e) => setNumberOfQuestions(Number(e.target.value))}/>
         </div>
         <ul className="w-9/10">{quizList}</ul>
-        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-5 pt-5 pd-5 m-5 gap-5">
-                <h1>Enter course Start date</h1>
-                <input type="date" className="text-right border pl-6"/>
-            </div>
-            <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-5 pt-5 pd-5 m-5 gap-5">
-                <h1>Enter course End date</h1>
-                <input type="date" className="text-right border pl-6"/>
-            </div>
-        <button className="bg-[#F5F1E6] w-1/5 rounded-sm p-2">Submit</button>
+        <div className="flex flex-row bg-[#F5F1E6] rounded-full p-5 pt-5 m-2 gap-5">
+          <h1>Enter course Start date</h1>
+          <input type="date" className="text-right border pl-6" />
+        </div>
+        <div className="flex flex-row bg-[#F5F1E6] rounded-full p-5 pt-5 m-2 gap-5">
+          <h1>Enter course End date</h1>
+          <input type="date" className="text-right border pl-6" />
+        </div>
+        <button className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] hover:opacity-90 transition">
+          Submit
+        </button>
       </main>
     </div>
   );

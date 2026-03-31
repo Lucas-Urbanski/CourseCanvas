@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function CourseCreation() {
   return (
-    <div className="min-h-screen font-sans bg-[#F5F1E6]">
+    <div className="flex flex-col min-h-screen font-sans bg-[#F5F1E6]">
       <header className="bg-[#D9D2C3] border-b border-black/10 px-8 py-4 flex items-center justify-between">
         <Link
           href="/home"
@@ -33,10 +33,17 @@ export default function CourseCreation() {
         </div>
       </header>
       <main className="flex flex-col bg-[#D9D2C3] min-h-screen w-1/3 m-10 rounded-sm mx-auto items-center text-zinc-500">
-        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-2 m-2 mt-10">
+        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-2 m-2 mt-8">
           <input
             type="text"
-            placeholder="Enter course's Name"
+            placeholder="Enter Course Title"
+            className="text-center border"
+          />
+        </div>
+        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-2 m-2">
+          <input
+            type="text"
+            placeholder="Enter Course Description"
             className="text-center border"
           />
         </div>
