@@ -11,6 +11,8 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
+
+
 export default function Settings() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
