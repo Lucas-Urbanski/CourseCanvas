@@ -40,7 +40,7 @@ function HomeContent() {
           <span className="text-lg font-bold text-zinc-800">CourseCanvas</span>
         </Link>
 
-        <div className="max-w-md flex-1 px-4">
+        <div className="max-w-md flex-1 mr-14 px-4">
           <input
             type="text"
             placeholder="Search for courses..."
