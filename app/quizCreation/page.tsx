@@ -4,14 +4,21 @@ import Link from "next/link";
 import { useState } from "react";
 
 export default function QuizCreation() {
-  const [NumberOfQuestions, setNumberOfQuestions] = useState(0);
+  const [numberOfQuestions, setNumberOfQuestions] = useState(0);
+  const [answerArray, setAnswerArray] = useState([""]);
   const quizList = [];
 
-  if (NumberOfQuestions != 0){
-    if (NumberOfQuestions < 0){
+  function updateArray(index: number, answer: string) {
+    const tempArray = [...answerArray];
+    tempArray[index - 1] = answer;
+    setAnswerArray(tempArray);
+  }
+
+  if (numberOfQuestions != 0){
+    if (numberOfQuestions < 0){
         setNumberOfQuestions(0)
     }
-    for (let i = 1; i <= NumberOfQuestions; i++) {
+    for (let i = 1; i <= numberOfQuestions; i++) {
     quizList.push(
       <li key={i} className="bg-[#F5F1E6] h-1/2 rounded-sm p-5 m-5">
         <input type="text" placeholder="Enter Question" />
@@ -24,6 +31,13 @@ export default function QuizCreation() {
             <input type="text" placeholder="Enter Answer C" className="w-1/2"/>
             <input type="text" placeholder="Enter Answer D" className="w-1/2"/>
           </div>
+        </div>
+        <h1 className="mt-3">Select the right answer</h1>
+        <div className="flex justify-around mt-1">
+          <button onClick={() => updateArray(i, "A")}>A</button>
+          <button onClick={() => updateArray(i, "B")}>B</button>
+          <button onClick={() => updateArray(i, "C")}>C</button>
+          <button onClick={() => updateArray(i, "D")}>D</button>
         </div>
       </li>,
     );
@@ -62,7 +76,7 @@ export default function QuizCreation() {
       <main className="flex flex-col bg-[#D9D2C3] min-h-screen w-1/3 m-10 rounded-sm mx-auto items-center">
         <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-5 m-5">
             <h1 className="pr-6">Enter Number of Questions in quiz</h1>
-            <input type="number" value={NumberOfQuestions} className="text-right border pl-6"
+            <input type="number" value={numberOfQuestions} className="text-right border pl-6"
             onChange={(e) => setNumberOfQuestions(Number(e.target.value))}/>
         </div>
         <ul className="w-9/10">{quizList}</ul>
