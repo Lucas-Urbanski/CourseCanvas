@@ -4,57 +4,51 @@ import Link from "next/link";
 import { BookOpen, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+import { supabase } from "@/lib/supabase";
 
 export default function SignUpPage() {
   const router = useRouter();
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("student");
+  const [role, setRole] = useState<"student" | "instructor">("student");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
+    setMessage("");
 
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
-      setLoading(false);
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
     setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            fullName: fullName,
-            role: role,
-          },
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role,
         },
-      });
-      if (error) throw error;
-      router.push("/home");
-    } catch (error) {
-      console.error("Error signing up:", error);
-      setError("Failed to create account.");
-    } finally {
-      setLoading(false);
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
     }
+
+    setMessage("Account created successfully.");
+    router.push("/home");
   };
 
   return (
@@ -72,10 +66,7 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label
-              htmlFor="fullName"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-zinc-700">
               Full Name
             </label>
             <input
@@ -89,10 +80,7 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
               Email
             </label>
             <input
@@ -106,10 +94,7 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
               Password
             </label>
             <input
@@ -123,16 +108,13 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="role"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="role" className="mb-2 block text-sm font-medium text-zinc-700">
               Role
             </label>
             <select
               id="role"
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => setRole(e.target.value as "student" | "instructor")}
               className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
             >
               <option value="student">Student</option>
@@ -146,22 +128,25 @@ export default function SignUpPage() {
             </p>
           )}
 
+          {message && (
+            <p className="rounded-xl bg-green-100 px-4 py-3 text-sm text-green-700">
+              {message}
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90 disabled:opacity-60"
           >
             <UserPlus size={18} />
-            {loading ? "Creating Account..." : "Create Account"}
+            {loading ? "Creating..." : "Create Account"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Already have an account?{" "}
-          <Link
-            href="/signin"
-            className="font-semibold text-zinc-800 hover:underline"
-          >
+          <Link href="/signin" className="font-semibold text-zinc-800 hover:underline">
             Sign in
           </Link>
         </p>

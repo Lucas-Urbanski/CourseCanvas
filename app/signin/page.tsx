@@ -4,12 +4,7 @@ import Link from "next/link";
 import { BookOpen, LogIn } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
+import { supabase } from "@/lib/supabase";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -22,29 +17,27 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
     if (!email.trim() || !password.trim()) {
       setError("Please enter your email and password.");
-      setLoading(false);
       return;
     }
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    setLoading(true);
 
-      if (error) throw error;
-      router.push("/home");
-      router.refresh();
-    } catch (error) {
-      console.error("Error signing in:", error);
-      setError("Failed to sign in.");
-    } finally {
-      setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
     }
+
+    router.replace("/home");
   };
 
   return (
@@ -62,10 +55,7 @@ export default function SignInPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
               Email
             </label>
             <input
@@ -79,10 +69,7 @@ export default function SignInPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-zinc-700"
-            >
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
               Password
             </label>
             <input
@@ -104,7 +91,7 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90 disabled:opacity-60"
           >
             <LogIn size={18} />
             {loading ? "Signing In..." : "Sign In"}
@@ -113,10 +100,7 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Don&apos;t have an account?{" "}
-          <Link
-            href="/signup"
-            className="font-semibold text-zinc-800 hover:underline"
-          >
+          <Link href="/signup" className="font-semibold text-zinc-800 hover:underline">
             Sign up
           </Link>
         </p>
