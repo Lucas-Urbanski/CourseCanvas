@@ -21,7 +21,7 @@ export default function Home() {
         </Link>
 
         {/* Search Bar */}
-        <div className="flex-1 max-w-md px-4">
+        <div className="flex-1 max-w-md mr-15.5 px-4">
           <input
             type="text"
             placeholder="Search for courses..."
@@ -46,43 +46,47 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="p-10">
-        {isTeacher ? (
-          <Link href="/course">
-            <CourseCard
-              courses={[
-                {
-                  id: "CS101",
-                  name: "Intro to Computer Science",
-                  description:
-                    "Learn the fundamentals of computer science and programming.",
-                  teacher: "Dr. Smith",
-                  startDate: "2027-09-01",
-                },
-                {
-                  id: "WD202",
-                  name: "Intro to Web Development",
-                  description:
-                    "A comprehensive course on modern web development.",
-                  teacher: "Ms. Johnson",
-                  startDate: "2027-10-15",
-                },
-                {
-                  id: "DS303",
-                  name: "Data Structures and Algorithms",
-                  description:
-                    "Explore advanced data structures and algorithmic approaches.",
-                  teacher: "Prof. Williams",
-                  startDate: "2027-11-01",
-                },
-              ]}
-            />
+      {isTeacher && (
+        <div className="flex items-center justify-center mt-6">
+          <Link
+            href="/courseCreation"
+            className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] hover:opacity-90 transition"
+          >
+            Create Course
           </Link>
-        ) : (
-          <div className="text-center text-zinc-500 mt-20">
-            No courses enrolled yet.
-          </div>
-        )}
+        </div>
+      )}
+      <main className="p-10">
+        <Link href="/course">
+          <CourseCard
+            courses={[
+              {
+                id: "CS101",
+                name: "Intro to Computer Science",
+                description:
+                  "Learn the fundamentals of computer science and programming.",
+                teacher: "Dr. Smith",
+                startDate: "2027-09-01",
+              },
+              {
+                id: "WD202",
+                name: "Intro to Web Development",
+                description:
+                  "A comprehensive course on modern web development.",
+                teacher: "Ms. Johnson",
+                startDate: "2027-10-15",
+              },
+              {
+                id: "DS303",
+                name: "Data Structures and Algorithms",
+                description:
+                  "Explore advanced data structures and algorithmic approaches.",
+                teacher: "Prof. Williams",
+                startDate: "2027-11-01",
+              },
+            ]}
+          />
+        </Link>
       </main>
     </div>
   );

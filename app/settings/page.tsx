@@ -1,16 +1,16 @@
 "use client";
 
-
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, LogOut, Save, Camera } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
-  // Using the newer SSR client to match your SignUp page
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+// Using the newer SSR client to match your SignUp page
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
 
 export default function Settings() {
   const router = useRouter();
@@ -45,10 +45,9 @@ export default function Settings() {
           setBio(profile.bio || "");
           setAvatarUrl(profile.avatarUrl || "");
         }
-      } 
-      // else {
-      //   router.push("/signin");
-      // }
+      } else {
+        router.push("/signin");
+      }
       setLoading(false);
     };
 
@@ -130,7 +129,7 @@ export default function Settings() {
           <div className="relative group">
             <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-zinc-200 shadow-md">
               {avatarUrl ? (
-                <img
+                <Image
                   src={avatarUrl}
                   alt="Profile"
                   className="h-full w-full object-cover"
