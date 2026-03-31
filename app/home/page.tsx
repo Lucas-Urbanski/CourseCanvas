@@ -41,8 +41,6 @@ function HomeContent() {
         </Link>
 
         <div className="max-w-md flex-1 px-4">
-        {/* Search Bar */}
-        <div className="flex-1 max-w-md mr-15.5 px-4">
           <input
             type="text"
             placeholder="Search for courses..."
@@ -61,6 +59,17 @@ function HomeContent() {
         </div>
       </header>
 
+      {isTeacher && (
+        <div className="mt-6 flex items-center justify-center">
+          <Link
+            href="/courseCreation"
+            className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+          >
+            Create Course
+          </Link>
+        </div>
+      )}
+
       <main className="p-10">
         {!user ? (
           <div className="mt-20 text-center">
@@ -75,19 +84,6 @@ function HomeContent() {
             </Link>
           </div>
         ) : isTeacher ? (
-      {/* Main Content */}
-      {isTeacher && (
-        <div className="flex items-center justify-center mt-6">
-          <Link
-            href="/courseCreation"
-            className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] hover:opacity-90 transition"
-          >
-            Create Course
-          </Link>
-        </div>
-      )}
-      <main className="p-10">
-        <Link href="/course">
           <CourseCard
             courses={[
               {
@@ -130,7 +126,6 @@ function HomeContent() {
             ]}
           />
         )}
-        </Link>
       </main>
     </div>
   );
