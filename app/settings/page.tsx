@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -131,7 +130,7 @@ export default function Settings() {
           <div className="relative group">
             <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-zinc-200 shadow-md">
               {avatarUrl ? (
-                <Image
+                <img
                   src={avatarUrl}
                   alt="Profile"
                   className="h-full w-full object-cover"

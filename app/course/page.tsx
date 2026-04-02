@@ -60,11 +60,11 @@ function CourseContent() {
 
             {isTeacher && (
               <Link
-                href="/courseCreation"
+                href="/quizCreation"
                 className="flex items-center gap-2 rounded-xl bg-zinc-800 px-6 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
               >
                 <PlusCircle size={18} />
-                Create Course
+                Create Quiz
               </Link>
             )}
           </div>

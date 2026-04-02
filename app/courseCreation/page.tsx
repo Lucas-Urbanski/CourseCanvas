@@ -36,26 +36,26 @@ export default function CourseCreation() {
           </div>
         </div>
       </header>
-      <main className="flex flex-col bg-[#D9D2C3] min-h-screen w-1/3 m-10 rounded-sm mx-auto items-center text-zinc-500">
-        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-2 m-2 mt-8">
+      <main className="flex flex-col min-h-screen w-1/3 m-10 mx-auto items-center text-zinc-800 rounded-3xl border border-zinc-300 bg-white/50 shadow-sm">
+        <div className="flex flex-row bg-[#F5F1E6] rounded-xl shadow-sm p-2 m-2 mt-8">
           <input
             type="text"
             placeholder="Enter Course Title"
             className="text-center border"
           />
         </div>
-        <div className="flex flex-row bg-[#F5F1E6] rounded-sm p-2 m-2">
+        <div className="flex flex-row bg-[#F5F1E6] rounded-xl shadow-sm p-2 m-2">
           <input
             type="text"
             placeholder="Enter Course Description"
             className="text-center border"
           />
         </div>
-        <div className="flex flex-row bg-[#F5F1E6] rounded-full p-5 pt-5 m-2 gap-5">
+        <div className="flex flex-row bg-[#F5F1E6] rounded-full shadow-sm p-5 pt-5 m-2 gap-5">
           <h1>Enter course Start date:</h1>
           <input type="date" className="text-right border pl-6" />
         </div>
-        <div className="flex flex-row bg-[#F5F1E6] rounded-full p-5 pt-5 m-2 gap-5">
+        <div className="flex flex-row bg-[#F5F1E6] rounded-full shadow-sm p-5 pt-5 m-2 gap-5">
           <h1>Enter course End date:</h1>
           <input type="date" className="text-right border pl-6" />
         </div>
