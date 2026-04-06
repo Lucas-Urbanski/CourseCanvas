@@ -76,7 +76,7 @@ export default function QuizCreation() {
             </span>
           </Link>
 
-          <div className="flex-1 max-w-md mr-15.5 px-4 text-center">
+          <div className="flex-1 max-w-md px-4 text-center sm:mr-15.5">
             <h1 className="font-bold text-zinc-800 text-lg">Quiz Creation</h1>
           </div>
 
@@ -94,7 +94,7 @@ export default function QuizCreation() {
           </div>
         </div>
       </header>
-      <main className="flex flex-col min-h-screen w-1/2 m-10 mx-auto items-center text-zinc-800 rounded-3xl border border-zinc-300 bg-white/50 p-8 shadow-sm">
+      <main className="flex flex-col min-h-screen m-10 mx-auto sm:min-w-xl md:min-w-2xl lg:min-w-3xl xl:min-w-4xl items-center text-zinc-800 rounded-3xl border border-zinc-300 bg-white/50 p-8 shadow-sm">
         <div className="flex flex-col bg-[#F5F1E6] rounded-xl shadow-sm p-5 m-5 gap-2">
           <h1 className="pr-6">Enter Number of Questions in The Quiz</h1>
           <input
@@ -113,7 +113,7 @@ export default function QuizCreation() {
           <h1>Enter course End date</h1>
           <input type="date" className="text-right border pl-6" />
         </div>
-        <button className="flex w-1/4 items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-3 font-semibold text-[#F5F1E6] hover:opacity-90 transition">
+        <button className="flex w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 items-center justify-center rounded-xl bg-zinc-800 px-4 py-3 m-2 font-semibold text-[#F5F1E6] hover:opacity-90 transition">
           Submit
         </button>
       </main>

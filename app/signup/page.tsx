@@ -41,7 +41,7 @@ export default function SignUpPage() {
       password,
       options: {
         data: {
-          full_name: fullName,
+          fullName: fullName,
           role,
         },
       },
