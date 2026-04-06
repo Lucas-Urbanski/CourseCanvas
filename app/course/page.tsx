@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
-  PlusCircle,
-  ArrowLeft,
   CalendarDays,
   Users,
   UserCircle,
+  FileQuestion,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import AuthGuard from "../components/AuthGuard";
@@ -33,6 +32,23 @@ function CourseContent() {
     startDate: "May 6, 2026",
     endDate: "August 20, 2026",
     students: ["Alex Brown", "Jamie Lee", "Taylor Smith", "Jordan White"],
+    quizzes: [
+      {
+        id: 1,
+        title: "HTML Basics Quiz",
+        dueDate: "May 20, 2026",
+      },
+      {
+        id: 2,
+        title: "CSS Fundamentals Quiz",
+        dueDate: "June 3, 2026",
+      },
+      {
+        id: 3,
+        title: "JavaScript Intro Quiz",
+        dueDate: "June 17, 2026",
+      },
+    ],
   };
 
   return (
@@ -52,18 +68,16 @@ function CourseContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/home")}
-              className="flex flex-row items-center gap-1 rounded-xl bg-zinc-800 px-6 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+              className="rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90"
             >
-              <ArrowLeft size={18} />
-              Back to Home
+              ← Back to Home
             </button>
 
             {isTeacher && (
               <Link
                 href="/quizCreation"
-                className="flex items-center gap-2 rounded-xl bg-zinc-800 px-6 py-3 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+                className="rounded-xl bg-zinc-800 px-4 py-2 font-medium text-[#F5F1E6] transition hover:opacity-90"
               >
-                <PlusCircle size={18} />
                 Create Quiz
               </Link>
             )}
@@ -100,6 +114,27 @@ function CourseContent() {
               <p className="text-zinc-800">Start: {course.startDate}</p>
               <p className="text-zinc-800">End: {course.endDate}</p>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-zinc-300 bg-white p-8 shadow-lg">
+          <div className="mb-6 flex items-center gap-2 text-zinc-700">
+            <FileQuestion size={20} />
+            <h2 className="text-xl font-bold text-zinc-800">Quizzes</h2>
+          </div>
+
+          <div className="grid gap-4">
+            {course.quizzes.map((quiz) => (
+              <div
+                key={quiz.id}
+                className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5"
+              >
+                <h3 className="text-lg font-semibold text-zinc-800">
+                  {quiz.title}
+                </h3>
+                <p className="mt-1 text-zinc-600">Due: {quiz.dueDate}</p>
+              </div>
+            ))}
           </div>
         </section>
 
