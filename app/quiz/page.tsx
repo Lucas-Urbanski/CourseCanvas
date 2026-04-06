@@ -27,7 +27,7 @@ export default function Quiz() {
           {[1, 2, 3].map((item) => (
             <section 
               key={item} 
-              className="bg-white rounded-[2rem] border border-zinc-200 p-8 md:p-10 shadow-sm transition-all hover:shadow-md"
+              className="bg-white rounded-[rem] border border-zinc-200 p-8 md:p-10 shadow-sm transition-all hover:shadow-md"
             >
               <div className="flex items-center gap-3 mb-4">
                 <span className="bg-zinc-100 text-zinc-500 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-zinc-200">
