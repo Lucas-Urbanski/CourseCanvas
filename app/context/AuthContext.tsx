@@ -1,27 +1,35 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 
-type UserRole = "student" | "instructor";
+type UserRole = "student" | "instructor" | "admin";
 
-type AuthUser = {
+interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: UserRole;
-};
+}
 
-type AuthContextType = {
+interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
-};
+  refreshUser: () => Promise<void>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Using the SSR-friendly browser client
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -34,6 +42,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const mapUser = useCallback(
+    (authUser: User): AuthUser => ({
+      id: authUser.id,
+      email: authUser.email ?? "",
+      name:
+        (authUser.user_metadata?.fullName as string) ||
+        (authUser.email?.split("@")[0] ?? "User"),
+      role: (authUser.user_metadata?.role as UserRole) || "student",
+    }),
+    [],
+  );
+
+  const refreshUser = useCallback(async () => {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (authUser) setUser(mapUser(authUser));
+    else setUser(null);
+  }, [supabase, mapUser]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -41,25 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const {
           data: { user: authUser },
-          error,
         } = await supabase.auth.getUser();
-
         if (!mounted) return;
-
-        if (error || !authUser) {
-          setUser(null);
-        } else {
-          setUser({
-            id: authUser.id,
-            email: authUser.email ?? "",
-            name:
-              (authUser.user_metadata?.fullName as string) ||
-              (authUser.email?.split("@")[0] ?? "User"),
-            role: (authUser.user_metadata?.role as UserRole) || "student",
-          });
-        }
+        setUser(authUser ? mapUser(authUser) : null);
       } catch (err) {
-        console.error("Auth context error:", err);
+        console.error("Auth load error:", err);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -67,42 +81,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     loadUser();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-
-      if (!session?.user) {
-        setUser(null);
-      } else {
-        const sUser = session.user;
-        setUser({
-          id: sUser.id,
-          email: sUser.email ?? "",
-          name:
-            (sUser.user_metadata?.fullName as string) ||
-            (sUser.email?.split("@")[0] ?? "User"),
-          role: (sUser.user_metadata?.role as UserRole) || "student",
-        });
-      }
-      setLoading(false);
-    });
-
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, mapUser]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
-  };
+  }, [supabase]);
+
+  const contextValue = useMemo(
+    () => ({ user, loading, signOut, refreshUser }),
+    [user, loading, signOut, refreshUser],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 
