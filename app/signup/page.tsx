@@ -138,7 +138,7 @@ export default function SignUpPage() {
             <input
               id="confirmPassword"
               type="password"
-              placeholder="Re-enter your password"
+              placeholder="Confirm your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
