@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { Check, XIcon, CheckCircle2 } from "lucide-react";
 
 export default function Quiz() {
+  const [clicked, setClicked] = useState<string | null>(null);
   const questions = [1, 2, 3, 4];
 
   return (
@@ -16,6 +18,11 @@ export default function Quiz() {
             className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all border border-zinc-200 bg-white hover:bg-zinc-800 hover:text-white hover:border-zinc-800 shadow-sm"
           >
             Q{q}
+            {clicked ? (
+              <Check className="text-green-400" size={12} />
+            ) : (
+              <XIcon className="text-red-400" size={12} />
+            )}
           </button>
         ))}
       </aside>
@@ -23,10 +30,9 @@ export default function Quiz() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center py-12 px-6 md:px-12">
         <div className="max-w-4xl w-full space-y-12">
-          
-          {[1, 2, 3].map((item) => (
-            <section 
-              key={item} 
+          {[1, 2, 3, 4].map((item) => (
+            <section
+              key={item}
               className="bg-white rounded-[2rem] border border-zinc-200 p-8 md:p-10 shadow-sm transition-all hover:shadow-md"
             >
               <div className="flex items-center gap-3 mb-4">
@@ -46,13 +52,19 @@ export default function Quiz() {
                   { letter: "A", text: "To get to the other side" },
                   { letter: "B", text: "To find its walking stick" },
                   { letter: "C", text: "To get to the KFC" },
-                  { letter: "D", text: "Why are you asking? The chicken can do what it wants." },
+                  {
+                    letter: "D",
+                    text: "Why are you asking? The chicken can do what it wants.",
+                  },
                 ].map((option) => (
                   <button
                     key={option.letter}
-                    className="flex items-start text-left gap-4 p-5 rounded-2xl border border-zinc-100 bg-zinc-50/50 transition-all hover:border-zinc-300 hover:bg-white group"
+                    onClick={() => setClicked(option.letter)}
+                    className="flex items-start text-left gap-4 p-5 rounded-2xl border border-zinc-100 bg-zinc-50/50 transition-all hover:border-zinc-300 hover:bg-white active:scale-95 transition transform duration-150 group"
                   >
-                    <span className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-white border border-zinc-200 font-bold text-xs group-hover:bg-zinc-800 group-hover:text-white group-hover:border-zinc-800">
+                    <span
+                      className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-white border border-zinc-200 font-bold text-xs group-hover:bg-zinc-800 group-hover:text-white group-hover:border-zinc-800 active:bg-zinc-800 active:text-white active:border-zinc-800 ${clicked === option.letter ? " bg-zinc-800 text-white border-zinc-800" : null}`}
+                    >
                       {option.letter}
                     </span>
                     <span className="text-zinc-700 font-medium pt-1 leading-relaxed">
@@ -71,7 +83,10 @@ export default function Quiz() {
               className="group flex items-center gap-3 rounded-2xl bg-zinc-900 px-10 py-4 font-bold text-[#F5F1E6] transition-all hover:scale-[1.02] hover:bg-black shadow-lg"
             >
               Submit Quiz
-              <CheckCircle2 size={20} className="text-zinc-400 group-hover:text-white" />
+              <CheckCircle2
+                size={20}
+                className="text-zinc-400 group-hover:text-white"
+              />
             </Link>
           </div>
         </div>

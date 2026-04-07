@@ -14,6 +14,7 @@ type Course = {
   description: string;
   instructor: string;
   startDate: string;
+  endDate?: string;
 };
 
 function HomeContent() {

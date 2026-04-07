@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS public.profiles, public.courses, public.quizzes CASCADE;
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users NOT NULL PRIMARY KEY,
   "fullName" TEXT,
+  email TEXT,
   role TEXT CHECK (role IN ('student', 'instructor')) DEFAULT 'student',
   bio TEXT DEFAULT NULL,
   "avatarUrl" TEXT DEFAULT NULL,

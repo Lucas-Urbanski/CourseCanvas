@@ -1,4 +1,4 @@
-import { Settings, BookOpen } from "lucide-react";
+import { Settings, BookOpen, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
 export default function CourseCreation() {
@@ -18,9 +18,9 @@ export default function CourseCreation() {
             </span>
           </Link>
 
-        <div className="flex-1 max-w-md px-4 text-center sm:mr-15.5">
-          <h1 className="font-bold text-zinc-800 text-lg">Course Creation</h1>
-        </div>
+          <div className="flex-1 max-w-md px-4 text-center sm:mr-15.5">
+            <h1 className="font-bold text-zinc-800 text-lg">Course Creation</h1>
+          </div>
 
           <div className="flex items-center gap-5">
             <Link
@@ -59,9 +59,13 @@ export default function CourseCreation() {
           <h1>Enter course End date:</h1>
           <input type="date" className="text-right border pl-6" />
         </div>
-        <button className="flex w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 items-center justify-center rounded-xl bg-zinc-800 px-4 py-3 m-2 font-semibold text-[#F5F1E6] hover:opacity-90 transition ">
-          Submit
-        </button>
+        <Link
+          href="/course"
+          className="flex items-center gap-2 rounded-xl bg-zinc-800 px-6 py-3 m-2 font-semibold text-[#F5F1E6] transition hover:opacity-90"
+        >
+          <PlusCircle size={18} />
+          Create Course
+        </Link>
       </main>
     </div>
   );
