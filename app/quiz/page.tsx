@@ -1,12 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, CheckCircle2, Circle } from "lucide-react";
+import { createBrowserClient } from "@supabase/ssr";
+import { useAuth } from "../context/AuthContext";
+import AuthGuard from "../components/AuthGuard";
 
-export default function Quiz() {
+async function QuizContent() {
+    const supabase = useMemo(
+      () =>
+        createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        ),
+      [],
+    );
+
+  const { user } = useAuth();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const questions = [1, 2, 3, 4];
+
+  // const { error: quizError } = await supabase
+  //   .from("quizzes")
+  //   .select("*")
+  //   .eq("id", quizId)
+  //   .single();
 
   const handleSelect = (qId: number, letter: string) => {
     setAnswers((prev) => ({ ...prev, [qId]: letter }));
@@ -28,9 +47,9 @@ export default function Quiz() {
               key={q}
               onClick={() => scrollToQuestion(q)}
               className={`group relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs transition-all border shadow-sm ${
-                isAnswered 
-                ? "bg-zinc-900 border-zinc-900 text-white" 
-                : "bg-white border-zinc-200 text-zinc-400 hover:border-zinc-800 hover:text-zinc-800"
+                isAnswered
+                  ? "bg-zinc-900 border-zinc-900 text-white"
+                  : "bg-white border-zinc-200 text-zinc-400 hover:border-zinc-800 hover:text-zinc-800"
               }`}
             >
               Q{q}
@@ -58,7 +77,9 @@ export default function Quiz() {
               id={`question-${item}`}
               key={item}
               className={`bg-white rounded-[2.5rem] border p-8 md:p-12 shadow-sm transition-all duration-500 ${
-                answers[item] ? "border-zinc-300 opacity-100" : "border-zinc-200 opacity-90"
+                answers[item]
+                  ? "border-zinc-300 opacity-100"
+                  : "border-zinc-200 opacity-90"
               }`}
             >
               <div className="flex items-center justify-between mb-6">
@@ -70,23 +91,21 @@ export default function Quiz() {
                     Question {item}
                   </span>
                 </div>
-                {answers[item] && (
-                  <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 animate-in fade-in zoom-in">
-                    <Check size={12} strokeWidth={3} /> Selected {answers[item]}
-                  </span>
-                )}
+
+                <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 animate-in fade-in zoom-in">
+                  <Check size={12} strokeWidth={3} />
+                </span>
               </div>
 
               <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 mb-10 leading-tight">
-                {item === 1 ? "Which hook is used to handle side effects in React?" : "Why did the chicken cross the road?"}
+                {item === 1
+                  ? "Which hook is used to handle side effects in React?"
+                  : "Why did the chicken cross the road?"}
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
-                  { letter: "A", text: "useState" },
-                  { letter: "B", text: "useEffect" },
-                  { letter: "C", text: "useContext" },
-                  { letter: "D", text: "useReducer" },
+                  { letter: "A", text: item === 1 ? "useEffect" : "To get to the other side" },
                 ].map((option) => {
                   const isSelected = answers[item] === option.letter;
                   return (
@@ -108,7 +127,9 @@ export default function Quiz() {
                       >
                         {option.letter}
                       </span>
-                      <span className={`font-medium pt-1 leading-relaxed ${isSelected ? "text-zinc-100" : "text-zinc-700"}`}>
+                      <span
+                        className={`font-medium pt-1 leading-relaxed ${isSelected ? "text-zinc-100" : "text-zinc-700"}`}
+                      >
                         {option.text}
                       </span>
                     </button>
@@ -127,8 +148,8 @@ export default function Quiz() {
               href="/course"
               className={`group flex items-center gap-3 rounded-2xl px-12 py-5 font-bold transition-all shadow-xl ${
                 Object.keys(answers).length === questions.length
-                ? "bg-zinc-900 text-[#F5F1E6] hover:bg-black hover:scale-[1.02]"
-                : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+                  ? "bg-zinc-900 text-[#F5F1E6] hover:bg-black hover:scale-[1.02]"
+                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
               }`}
             >
               Submit Quiz
@@ -138,5 +159,12 @@ export default function Quiz() {
         </div>
       </div>
     </main>
+  );
+}
+export default function Quiz() {
+  return (
+    <AuthGuard>
+      <QuizContent />
+    </AuthGuard>
   );
 }

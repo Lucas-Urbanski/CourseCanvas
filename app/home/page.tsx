@@ -149,45 +149,6 @@ function HomeContent() {
                       ? "No courses match your search."
                       : "No courses available yet."}
                   </p>
-
-                  {/* Temporary course for testing */}
-                  <Link
-                    href="/course"
-                    className="group relative w-full max-w-md overflow-hidden rounded-3xl border border-zinc-300 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-                  >
-                    <div className="absolute top-0 right-0 p-4">
-                      <div className="rounded-full bg-zinc-800 p-2 text-[#F5F1E6] opacity-0 transition-opacity group-hover:opacity-100">
-                        <BookOpen size={16} />
-                      </div>
-                    </div>
-
-                    <div className="mb-4 inline-block rounded-lg bg-[#F5F1E6] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-800 border border-zinc-200">
-                      Demo Course
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-zinc-800 group-hover:text-black transition-colors">
-                      Intro to CourseCanvas
-                    </h3>
-
-                    <p className="mt-3 text-sm leading-relaxed text-zinc-600">
-                      Learn how to navigate your new dashboard, manage quizzes,
-                      and track your progress.
-                    </p>
-
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-100 pt-6">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-xs font-bold text-zinc-500">
-                          CC
-                        </div>
-                        <span className="text-xs font-semibold text-zinc-700">
-                          CourseCanvas Team
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold text-zinc-800 underline underline-offset-4 decoration-zinc-300 group-hover:decoration-zinc-800 transition-all">
-                        Enter Course
-                      </span>
-                    </div>
-                  </Link>
                 </div>
               ) : (
                 <CourseCard courses={filteredCourses} />

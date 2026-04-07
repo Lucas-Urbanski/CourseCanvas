@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   Settings,
   BookOpen,
@@ -8,9 +10,49 @@ import {
   FileText,
   Type,
 } from "lucide-react";
-import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
+import { useAuth } from "../context/AuthContext";
+import AuthGuard from "../components/AuthGuard";
 
-export default function CourseCreation() {
+function CourseCreationContent() {
+  const supabase = useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      ),
+    [],
+  );
+
+  const { user } = useAuth();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+    const handleCreateCourse = async () => {
+      const { error } = await supabase
+        .from("courses")
+        .insert({
+          "title": title,
+          "description": description,
+          "id": user?.id,
+          "startDate": startDate,
+          "endDate": endDate,
+        });
+
+
+        setDescription("")
+        setTitle("")
+        setStartDate("")
+        setEndDate("")
+
+      if (error) {
+        console.error("Error creating course:", error);
+      }
+    };
+
+
   return (
     <div className="flex flex-col min-h-screen font-sans bg-[#F5F1E6] text-zinc-800">
       {/* Header */}
@@ -65,6 +107,7 @@ export default function CourseCreation() {
               <input
                 type="text"
                 placeholder="e.g. Advanced System Architecture"
+                onBlur={(e) => setTitle(e.target.value)}
                 className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white focus:ring-4 focus:ring-zinc-800/5"
               />
             </div>
@@ -76,6 +119,7 @@ export default function CourseCreation() {
               </label>
               <textarea
                 placeholder="Briefly describe the course objectives..."
+                onBlur={(e) => setDescription(e.target.value)}
                 rows={4}
                 className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white focus:ring-4 focus:ring-zinc-800/5 resize-none"
               />
@@ -88,6 +132,7 @@ export default function CourseCreation() {
                   <Calendar size={14} /> Start Date
                 </label>
                 <input
+                  onBlur={(e) => setStartDate(e.target.value)}
                   type="date"
                   className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white"
                 />
@@ -97,6 +142,7 @@ export default function CourseCreation() {
                   <Calendar size={14} /> End Date
                 </label>
                 <input
+                onBlur={(e) => setEndDate(e.target.value)}
                   type="date"
                   className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white"
                 />
@@ -107,6 +153,7 @@ export default function CourseCreation() {
             <div className="pt-6">
               <Link
                 href="/course"
+                onClick={() => handleCreateCourse()}
                 className="flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-900 py-5 font-bold text-[#F5F1E6] transition-all hover:bg-black hover:scale-[1.01] shadow-lg shadow-zinc-900/20"
               >
                 <PlusCircle size={20} />
@@ -117,5 +164,13 @@ export default function CourseCreation() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CourseCreation() {
+  return (
+    <AuthGuard>
+      <CourseCreationContent />
+    </AuthGuard>
   );
 }

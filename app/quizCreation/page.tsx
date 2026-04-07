@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   Settings,
   BookOpen,
@@ -9,12 +11,41 @@ import {
   CheckCircle2,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import { useAuth } from "../context/AuthContext";
+import AuthGuard from "../components/AuthGuard";
 
-export default function QuizCreation() {
+
+
+function QuizCreationContent() {
+    const supabase = useMemo(
+      () =>
+        createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        ),
+      [],
+    );
+
+  const { user } = useAuth();
   const [numberOfQuestions, setNumberOfQuestions] = useState(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [questions, setQuestions] = useState<{ prompt: string; options: string[] }[]>([
+    { prompt: "", options: ["", "", "", ""] },
+  ]);
+
+    const handleCreateQuiz = async () => {
+      const { error } = await supabase
+        .from("quizzes")
+        .insert({
+          title: "My Quiz",
+          "dueDate": new Date(),
+          questions: []
+        });
+
+    }
 
   const handleUpdateAnswer = (index: number, choice: string) => {
     setAnswers((prev) => ({ ...prev, [index]: choice }));
@@ -150,5 +181,13 @@ export default function QuizCreation() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function QuizCreation() {
+  return (
+    <AuthGuard>
+      <QuizCreationContent />
+    </AuthGuard>
   );
 }
