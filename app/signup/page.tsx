@@ -6,14 +6,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
-const supabase = createClient();
-
 export default function SignUpPage() {
   const router = useRouter();
+  const supabase = createClient();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"student" | "instructor">("student");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -24,14 +24,19 @@ export default function SignUpPage() {
     setError("");
     setMessage("");
 
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
+    if (!fullName.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError("Please fill in all fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -49,8 +54,13 @@ export default function SignUpPage() {
       return;
     }
 
-    setMessage("Account created successfully.");
-    router.push("/home");
+    if (data.session) {
+      router.replace("/home");
+      router.refresh();
+      return;
+    }
+
+    setMessage("Account created. Check your email to confirm your account, then sign in.");
   };
 
   return (
@@ -68,7 +78,10 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="fullName" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="fullName"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Full Name
             </label>
             <input
@@ -82,7 +95,10 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Email
             </label>
             <input
@@ -96,7 +112,10 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Password
             </label>
             <input
@@ -110,7 +129,27 @@ export default function SignUpPage() {
           </div>
 
           <div>
-            <label htmlFor="role" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="confirmPassword"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-zinc-800 outline-none transition focus:border-zinc-800"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="role"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Role
             </label>
             <select
@@ -148,7 +187,10 @@ export default function SignUpPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Already have an account?{" "}
-          <Link href="/signin" className="font-semibold text-zinc-800 hover:underline">
+          <Link
+            href="/signin"
+            className="font-semibold text-zinc-800 hover:underline"
+          >
             Sign in
           </Link>
         </p>
