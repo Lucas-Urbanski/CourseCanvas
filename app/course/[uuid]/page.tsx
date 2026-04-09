@@ -11,6 +11,7 @@ import {
   FileQuestion,
   ChevronRight,
   Plus,
+  Upload,
   GraduationCap,
   Lock,
   FileText,
@@ -438,7 +439,7 @@ function CourseContent() {
                     "Uploading..."
                   ) : (
                     <>
-                      <Plus size={16} /> Upload Lesson
+                      <Upload size={16} /> Upload Lesson
                     </>
                   )}
                 </button>
