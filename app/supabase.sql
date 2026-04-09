@@ -258,3 +258,15 @@ WITH CHECK (
       AND courses."instructorId" = auth.uid()
   )
 );
+
+CREATE POLICY "Instructors can create their own quizzes"
+ON public.quizzes
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() 
+    AND role = 'instructor'
+  )
+);

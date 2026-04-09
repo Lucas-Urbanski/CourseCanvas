@@ -1,61 +1,138 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import {
-  Settings,
   BookOpen,
-  Plus,
-  HelpCircle,
   Calendar,
   CheckCircle2,
+  HelpCircle,
+  Plus,
+  Settings,
   Trash2,
   Type,
 } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
-import { useAuth } from "../context/AuthContext";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import AuthGuard from "../components/AuthGuard";
+import { useAuth } from "../context/AuthContext";
+import router from "next/router";
 
-type Question = {
+
+class Question {
   id: number;
+  prompt: string;
+  A: string;
+  B: string;
+  C: string;
+  D: string;
+
+  constructor(id: number, prompt: string = "", A: string = "", B: string = "", C: string = "", D: string = "",){
+    this.id = id;
+    this.prompt = prompt;
+    this.A = A;
+    this.B = B;
+    this.C = C;
+    this.D = D;
+  }
 };
 
 function QuizCreationContent() {
+  const courseId = localStorage.getItem("courseid");
   const { user } = useAuth();
   const today = new Date();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState(today.toLocaleDateString());
-  const [questions, setQuestions] = useState<Question[]>([{ id: 1 }]);
-    const supabase = useMemo(
-      () =>
-        createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        ),
-      [],
-    );
- 
+  const [questions, setQuestions] = useState<Question[]>([new Question(1)]);
 
-    const handleCreateQuiz = async () => {
+  const supabase = useMemo(
+    () =>
+      createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      ),
+    [],
+  );
+
+  const handleCreateQuiz = async () => {
+    if (!user) {
+      alert("You must be signed in to create a quiz.");
+      return;
+    }
+
+    if (!title.trim()) {
+      alert("Please enter a quiz title.");
+      return;
+    }
+
+    if (!dueDate) {
+      alert("You must have a due date.");
+      return;
+    }
+
+    if (!courseId) {
+      alert("Something went wrong go back to the course page and try again.");
+      return;
+    }
+
+
+    try {
+
       const { error } = await supabase
         .from("quizzes")
         .insert({
-          title: "My Quiz",
-          "dueDate": new Date(),
-          questions: []
-        });
+          courseId: courseId,
+          title,
+          dueDate,
+          questions
+        })
+        .select("id")
+        .single();
 
+      if (error) {
+        throw error;
+      }
+
+      router.push(`/course/${courseId}`);
+    } catch (error: any) {
+      console.error("Error creating quiz:", error);
+      alert(error?.message || "Failed to create quiz.");
     }
+  };
 
-  const numberOfQuestions = questions.length;
+  const handleUpdateQuestion = (questionId: number, whatIsGetttingUpdated: string, newQuestionValue: string) => {
+    const updatedQuestions = questions.map(question =>{
+      if(question.id === questionId){
+        if(whatIsGetttingUpdated === "prompt"){
+          question.prompt = newQuestionValue;
+        }
+        else if(whatIsGetttingUpdated === "A")  {
+          question.A = newQuestionValue;
+        }
+        else if(whatIsGetttingUpdated === "B")  {
+          question.B = newQuestionValue;
+        }
+        else if(whatIsGetttingUpdated === "C")  {
+          question.C = newQuestionValue;
+        }
+        else if(whatIsGetttingUpdated === "D")  {
+          question.D = newQuestionValue;
+        }
+        return question;
+      }
+      return question;
+    });
+    setQuestions(updatedQuestions);
+  }
 
   const handleUpdateAnswer = (questionId: number, choice: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: choice }));
   };
 
   const handleDeleteQuestion = (questionId: number) => {
-    setQuestions((prev) => prev.filter((question) => question.id !== questionId));
+    setQuestions((prev) =>
+      prev.filter((question) => question.id !== questionId),
+    );
 
     setAnswers((prev) => {
       const updatedAnswers = { ...prev };
@@ -65,29 +142,35 @@ function QuizCreationContent() {
   };
 
   const handleQuantityChange = (val: number) => {
-    let newValue = val;
+    console.log("questions: ",questions);
+    let newQuantity = val;
 
-    if (newValue < 0) newValue = 0;
-    if (newValue > 50) newValue = 50;
+    if (newQuantity < 0) {
+      newQuantity = 0;
+    }
+    if (newQuantity > 50) {
+      newQuantity = 50;
+    }
+    
+    const tempQuestions = questions;
+    
+    setQuestions((tempQuestions) => {
+      if (newQuantity === tempQuestions.length) return tempQuestions;
 
-    setQuestions((prev) => {
-      if (newValue === prev.length) return prev;
-
-      if (newValue > prev.length) {
+      if (newQuantity > tempQuestions.length) {
         const currentMaxId =
-          prev.length > 0 ? Math.max(...prev.map((question) => question.id)) : 0;
+          tempQuestions.length > 0 ? Math.max(...tempQuestions.map((question) => question.id)) : 0;
 
         const newQuestions = Array.from(
-          { length: newValue - prev.length },
-          (_, index) => ({
-            id: currentMaxId + index + 1,
-          })
+          { length: newQuantity - tempQuestions.length },
+          (_, index) => ( 
+          new Question(currentMaxId + index + 1)
+        )
         );
-
-        return [...prev, ...newQuestions];
+        return [...tempQuestions, ...newQuestions];
       }
 
-      const keptQuestions = prev.slice(0, newValue);
+      const keptQuestions = tempQuestions.slice(0, newQuantity);
       const keptIds = new Set(keptQuestions.map((question) => question.id));
 
       setAnswers((prevAnswers) => {
@@ -158,7 +241,7 @@ function QuizCreationContent() {
               </label>
               <input
                 type="number"
-                value={numberOfQuestions}
+                value={questions.length}
                 onChange={(e) => handleQuantityChange(Number(e.target.value))}
                 className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-3 text-lg font-bold outline-none transition-all focus:border-zinc-800 focus:bg-white"
               />
@@ -201,6 +284,7 @@ function QuizCreationContent() {
                 type="text"
                 placeholder="What is the question prompt?"
                 className="mb-6 w-full rounded-xl border border-zinc-100 bg-zinc-50 bg-transparent px-5 py-3 text-xl font-bold placeholder:text-zinc-300 outline-none"
+                onChange={(e) => handleUpdateQuestion(question.id,"prompt", e.target.value)}
               />
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -210,6 +294,7 @@ function QuizCreationContent() {
                       type="text"
                       placeholder={`Option ${letter}`}
                       className="w-full rounded-xl border border-zinc-100 bg-zinc-50 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-zinc-800 focus:bg-white"
+                      // onChange={(e) => setQuestionsInfo()}
                     />
                     <button
                       type="button"
@@ -237,7 +322,8 @@ function QuizCreationContent() {
         </div>
 
         <div className="flex justify-center">
-          <button className="flex items-center gap-3 rounded-2xl bg-zinc-900 px-8 py-4 font-bold text-[#F5F1E6] shadow-2xl transition-all hover:scale-[1.02] hover:bg-black active:scale-95">
+          <button className="flex items-center gap-3 rounded-2xl bg-zinc-900 px-8 py-4 font-bold text-[#F5F1E6] shadow-2xl transition-all hover:scale-[1.02] hover:bg-black active:scale-95"
+           onClick={handleCreateQuiz}>
             <Plus size={20} />
             Publish Quiz
           </button>

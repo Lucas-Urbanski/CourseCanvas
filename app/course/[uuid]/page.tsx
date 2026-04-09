@@ -69,6 +69,7 @@ function CourseContent() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
 
+  localStorage.setItem("courseid", course?.id || "null");
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);

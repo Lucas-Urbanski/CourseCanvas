@@ -7,7 +7,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../context/AuthContext";
 import AuthGuard from "../components/AuthGuard";
 
-async function QuizContent() {
+function QuizContent() {
     const supabase = useMemo(
       () =>
         createBrowserClient(
