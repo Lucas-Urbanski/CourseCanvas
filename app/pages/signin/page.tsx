@@ -6,7 +6,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
-
 export default function SignInPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -25,22 +24,23 @@ export default function SignInPage() {
       return;
     }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
 
-    if (error) {
-      setError(error.message);
-      return;
+      window.location.href = "/pages/home";
+    } finally {
+      setLoading(false);
     }
-
-    router.replace("/pages/home");
-    router.refresh();
   };
 
   return (
@@ -58,7 +58,10 @@ export default function SignInPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Email
             </label>
             <input
@@ -72,7 +75,10 @@ export default function SignInPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-zinc-700"
+            >
               Password
             </label>
             <input
@@ -103,7 +109,10 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Don&apos;t have an account?{" "}
-          <Link href="/pages/signup" className="font-semibold text-zinc-800 hover:underline">
+          <Link
+            href="/pages/signup"
+            className="font-semibold text-zinc-800 hover:underline"
+          >
             Sign up
           </Link>
         </p>
