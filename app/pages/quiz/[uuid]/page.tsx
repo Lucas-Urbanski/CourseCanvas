@@ -196,7 +196,7 @@ function QuizContent() {
             </p>
             <button
               type="button"
-              onClick={() => router.push(`/course/${quiz.courseId}`)}
+              onClick={() => router.push(`/pages/course/${quiz.courseId}`)}
               disabled={Object.keys(answers).length !== questions.length}
               className={`group flex items-center gap-3 rounded-2xl px-12 py-5 font-bold transition-all shadow-xl ${
                 Object.keys(answers).length === questions.length
