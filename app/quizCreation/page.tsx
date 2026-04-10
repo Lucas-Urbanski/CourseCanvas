@@ -12,38 +12,44 @@ import {
   Type,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import AuthGuard from "../components/AuthGuard";
 import { useAuth } from "../context/AuthContext";
-import router from "next/router";
+import { useRouter } from "next/navigation";
 
+type QuestionChoice = "A" | "B" | "C" | "D";
 
-class Question {
+type Question = {
   id: number;
   prompt: string;
   A: string;
   B: string;
   C: string;
   D: string;
-
-  constructor(id: number, prompt: string = "", A: string = "", B: string = "", C: string = "", D: string = "",){
-    this.id = id;
-    this.prompt = prompt;
-    this.A = A;
-    this.B = B;
-    this.C = C;
-    this.D = D;
-  }
 };
 
+function makeQuestion(id: number): Question {
+  return {
+    id,
+    prompt: "",
+    A: "",
+    B: "",
+    C: "",
+    D: "",
+  };
+}
+
 function QuizCreationContent() {
-  const courseId = localStorage.getItem("courseid");
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuth();
-  const today = new Date();
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const courseId = searchParams.get("courseId");
+
+  const [answers, setAnswers] = useState<Record<number, QuestionChoice>>({});
   const [title, setTitle] = useState("");
-  const [dueDate, setDueDate] = useState(today.toLocaleDateString());
-  const [questions, setQuestions] = useState<Question[]>([new Question(1)]);
+  const [dueDate, setDueDate] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([makeQuestion(1)]);
 
   const supabase = useMemo(
     () =>
@@ -55,43 +61,30 @@ function QuizCreationContent() {
   );
 
   const handleCreateQuiz = async () => {
-    if (!user) {
-      alert("You must be signed in to create a quiz.");
-      return;
-    }
-
-    if (!title.trim()) {
-      alert("Please enter a quiz title.");
-      return;
-    }
-
-    if (!dueDate) {
-      alert("You must have a due date.");
-      return;
-    }
-
-    if (!courseId) {
-      alert("Something went wrong go back to the course page and try again.");
-      return;
-    }
-
+    if (!user) return alert("You must be signed in.");
+    if (!title.trim()) return alert("Please enter a quiz title.");
+    if (!dueDate) return alert("You must have a due date.");
+    if (!courseId) return alert("Course ID missing. Please reload the course page.");
 
     try {
+      const finalQuestions = questions.map((q) => ({
+        id: q.id,
+        prompt: q.prompt,
+        A: q.A,
+        B: q.B,
+        C: q.C,
+        D: q.D,
+        correctAnswer: answers[q.id] || null,
+      }));
 
-      const { error } = await supabase
-        .from("quizzes")
-        .insert({
-          courseId: courseId,
-          title,
-          dueDate,
-          questions
-        })
-        .select("id")
-        .single();
+      const { error } = await supabase.from("quizzes").insert({
+        courseId,
+        title,
+        dueDate,
+        questions: finalQuestions,
+      });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       router.push(`/course/${courseId}`);
     } catch (error: any) {
@@ -100,81 +93,53 @@ function QuizCreationContent() {
     }
   };
 
-  const handleUpdateQuestion = (questionId: number, whatIsGetttingUpdated: string, newQuestionValue: string) => {
-    const updatedQuestions = questions.map(question =>{
-      if(question.id === questionId){
-        if(whatIsGetttingUpdated === "prompt"){
-          question.prompt = newQuestionValue;
-        }
-        else if(whatIsGetttingUpdated === "A")  {
-          question.A = newQuestionValue;
-        }
-        else if(whatIsGetttingUpdated === "B")  {
-          question.B = newQuestionValue;
-        }
-        else if(whatIsGetttingUpdated === "C")  {
-          question.C = newQuestionValue;
-        }
-        else if(whatIsGetttingUpdated === "D")  {
-          question.D = newQuestionValue;
-        }
-        return question;
-      }
-      return question;
-    });
-    setQuestions(updatedQuestions);
-  }
+  const handleUpdateQuestion = (
+    questionId: number,
+    field: keyof Omit<Question, "id">,
+    value: string,
+  ) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, [field]: value } : q)),
+    );
+  };
 
-  const handleUpdateAnswer = (questionId: number, choice: string) => {
+  const handleUpdateAnswer = (questionId: number, choice: QuestionChoice) => {
     setAnswers((prev) => ({ ...prev, [questionId]: choice }));
   };
 
   const handleDeleteQuestion = (questionId: number) => {
-    setQuestions((prev) =>
-      prev.filter((question) => question.id !== questionId),
-    );
+    setQuestions((prev) => prev.filter((question) => question.id !== questionId));
 
     setAnswers((prev) => {
-      const updatedAnswers = { ...prev };
-      delete updatedAnswers[questionId];
-      return updatedAnswers;
+      const updated = { ...prev };
+      delete updated[questionId];
+      return updated;
     });
   };
 
   const handleQuantityChange = (val: number) => {
-    console.log("questions: ",questions);
     let newQuantity = val;
 
-    if (newQuantity < 0) {
-      newQuantity = 0;
-    }
-    if (newQuantity > 50) {
-      newQuantity = 50;
-    }
-    
-    const tempQuestions = questions;
-    
-    setQuestions((tempQuestions) => {
-      if (newQuantity === tempQuestions.length) return tempQuestions;
+    if (newQuantity < 1) newQuantity = 1;
+    if (newQuantity > 50) newQuantity = 50;
 
-      if (newQuantity > tempQuestions.length) {
-        const currentMaxId =
-          tempQuestions.length > 0 ? Math.max(...tempQuestions.map((question) => question.id)) : 0;
+    setQuestions((prev) => {
+      if (newQuantity === prev.length) return prev;
 
+      if (newQuantity > prev.length) {
+        const currentMaxId = prev.length > 0 ? Math.max(...prev.map((q) => q.id)) : 0;
         const newQuestions = Array.from(
-          { length: newQuantity - tempQuestions.length },
-          (_, index) => ( 
-          new Question(currentMaxId + index + 1)
-        )
+          { length: newQuantity - prev.length },
+          (_, index) => makeQuestion(currentMaxId + index + 1),
         );
-        return [...tempQuestions, ...newQuestions];
+        return [...prev, ...newQuestions];
       }
 
-      const keptQuestions = tempQuestions.slice(0, newQuantity);
-      const keptIds = new Set(keptQuestions.map((question) => question.id));
+      const keptQuestions = prev.slice(0, newQuantity);
+      const keptIds = new Set(keptQuestions.map((q) => q.id));
 
       setAnswers((prevAnswers) => {
-        const updatedAnswers: Record<number, string> = {};
+        const updatedAnswers: Record<number, QuestionChoice> = {};
         for (const key in prevAnswers) {
           const numericKey = Number(key);
           if (keptIds.has(numericKey)) {
@@ -213,10 +178,7 @@ function QuizCreationContent() {
             className="flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 font-bold text-zinc-800 transition hover:bg-zinc-50"
           >
             Settings
-            <Settings
-              size={20}
-              className="transition-transform hover:rotate-45"
-            />
+            <Settings size={20} className="transition-transform hover:rotate-45" />
           </Link>
         </div>
       </header>
@@ -229,18 +191,20 @@ function QuizCreationContent() {
                 <Type size={14} /> Quiz Title
               </label>
               <input
-              type="text"
-              placeholder="Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-3 mb-8 text-lg font-bold outline-none transition-all focus:border-zinc-800 focus:bg-white"
-              >
-              </input>
+                type="text"
+                placeholder="Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mb-8 w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-3 text-lg font-bold outline-none transition-all focus:border-zinc-800 focus:bg-white"
+              />
+
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <HelpCircle size={14} /> Total Questions
               </label>
               <input
                 type="number"
+                min={1}
+                max={50}
                 value={questions.length}
                 onChange={(e) => handleQuantityChange(Number(e.target.value))}
                 className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-3 text-lg font-bold outline-none transition-all focus:border-zinc-800 focus:bg-white"
@@ -265,16 +229,16 @@ function QuizCreationContent() {
           {questions.map((question, i) => (
             <div
               key={question.id}
-              className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm transition-all hover:border-zinc-300"
+              className="group relative rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm"
             >
-              <div className="mb-6 flex items-center justify-between border-b border-zinc-50 pb-4">
-                <span className="text-xs font-black uppercase tracking-tighter text-zinc-500">
+              <div className="mb-6 flex items-center justify-between">
+                <span className="text-xs font-black uppercase text-zinc-500">
                   Question {i + 1}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleDeleteQuestion(question.id)}
-                  className="transition-colors text-zinc-300 hover:text-red-500"
+                  className="text-zinc-300 hover:text-red-500"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -283,26 +247,32 @@ function QuizCreationContent() {
               <input
                 type="text"
                 placeholder="What is the question prompt?"
-                className="mb-6 w-full rounded-xl border border-zinc-100 bg-zinc-50 bg-transparent px-5 py-3 text-xl font-bold placeholder:text-zinc-300 outline-none"
-                onChange={(e) => handleUpdateQuestion(question.id,"prompt", e.target.value)}
+                value={question.prompt}
+                className="mb-6 w-full text-xl font-bold outline-none placeholder:text-zinc-300"
+                onChange={(e) =>
+                  handleUpdateQuestion(question.id, "prompt", e.target.value)
+                }
               />
 
               <div className="grid gap-3 sm:grid-cols-2">
-                {["A", "B", "C", "D"].map((letter) => (
-                  <div key={letter} className="relative group/input">
+                {(["A", "B", "C", "D"] as QuestionChoice[]).map((letter) => (
+                  <div key={letter} className="relative">
                     <input
                       type="text"
                       placeholder={`Option ${letter}`}
-                      className="w-full rounded-xl border border-zinc-100 bg-zinc-50 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-zinc-800 focus:bg-white"
-                      // onChange={(e) => setQuestionsInfo()}
+                      value={question[letter]}
+                      className="w-full rounded-xl border border-zinc-100 bg-zinc-50 py-3 pl-12 pr-4 text-sm outline-none focus:border-zinc-800 focus:bg-white"
+                      onChange={(e) =>
+                        handleUpdateQuestion(question.id, letter, e.target.value)
+                      }
                     />
                     <button
                       type="button"
                       onClick={() => handleUpdateAnswer(question.id, letter)}
                       className={`absolute left-3 top-1/2 -translate-y-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-black transition-all ${
                         answers[question.id] === letter
-                          ? "bg-zinc-800 text-white shadow-lg"
-                          : "bg-zinc-200 text-zinc-500 hover:bg-zinc-300"
+                          ? "bg-zinc-800 text-white"
+                          : "bg-zinc-200 text-zinc-500"
                       }`}
                     >
                       {letter}
@@ -312,9 +282,8 @@ function QuizCreationContent() {
               </div>
 
               {answers[question.id] && (
-                <div className="animate-in slide-in-from-top-1 mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600 fade-in">
-                  <CheckCircle2 size={14} /> Correct Answer Set to{" "}
-                  {answers[question.id]}
+                <div className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                  <CheckCircle2 size={14} /> Correct Answer Set to {answers[question.id]}
                 </div>
               )}
             </div>
@@ -322,8 +291,11 @@ function QuizCreationContent() {
         </div>
 
         <div className="flex justify-center">
-          <button className="flex items-center gap-3 rounded-2xl bg-zinc-900 px-8 py-4 font-bold text-[#F5F1E6] shadow-2xl transition-all hover:scale-[1.02] hover:bg-black active:scale-95"
-           onClick={handleCreateQuiz}>
+          <button
+            type="button"
+            className="flex items-center gap-3 rounded-2xl bg-zinc-900 px-8 py-4 font-bold text-[#F5F1E6] shadow-2xl transition-all hover:scale-[1.02] hover:bg-black active:scale-95"
+            onClick={handleCreateQuiz}
+          >
             <Plus size={20} />
             Publish Quiz
           </button>

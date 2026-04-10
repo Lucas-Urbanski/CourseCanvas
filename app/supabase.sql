@@ -167,7 +167,6 @@ CREATE TABLE IF NOT EXISTS public.quizzes (
   "dueDate" DATE,
   status TEXT CHECK (status IN ('open', 'closed')) DEFAULT 'closed',
   questions JSONB NOT NULL,
-  answers JSONB NOT NULL,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
