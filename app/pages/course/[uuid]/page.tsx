@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   BookOpen,
@@ -18,15 +18,16 @@ import {
   Users,
   Trash2,
 } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
-import AuthGuard from "../../components/AuthGuard";
+import { useAuth } from "../../../context/AuthContext";
+import AuthGuard from "../../../components/AuthGuard";
 import { createClient } from "@/lib/supabase";
 
+// Types
 type Course = {
   id: string;
   name: string;
   description: string;
-  teacher: string;
+  instructor: string;
   startDate: string;
   endDate: string;
 };
@@ -35,7 +36,7 @@ type Quiz = {
   id: string;
   title: string;
   dueDate: string;
-  status: string;
+  status: "Open" | "Locked";
 };
 
 type Student = {
@@ -51,11 +52,11 @@ type Lesson = {
   filePath: string;
 };
 
+// Component
 function CourseContent() {
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
-
-  const supabase = useMemo(() => createClient(), []);
+  const [supabase] = useState(() => createClient());
 
   const { user } = useAuth();
   const isTeacher = user?.role === "instructor";
@@ -70,6 +71,12 @@ function CourseContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    localStorage.setItem("courseid", course?.id ?? "null");
+  }, [course?.id]);
+
+  useEffect(() => {
+    if (!uuid) return;
+
     const fetchData = async () => {
       setLoading(true);
 
@@ -96,7 +103,9 @@ function CourseContent() {
 
             supabase
               .from("lessons")
-              .select(`id, title, "fileName", "fileUrl", "filePath", "uploadedAt"`)
+              .select(
+                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt"`
+              )
               .eq("courseId", uuid)
               .order("uploadedAt", { ascending: false }),
           ]);
@@ -114,7 +123,7 @@ function CourseContent() {
                 id: rawCourse.id,
                 name: rawCourse.title,
                 description: rawCourse.description ?? "",
-                teacher: rawCourse.profiles?.fullName ?? "Unknown Instructor",
+                instructor: rawCourse.profiles?.fullName ?? "Unknown Instructor",
                 startDate: rawCourse.startDate ?? "",
                 endDate: rawCourse.endDate ?? "",
               }
@@ -123,19 +132,22 @@ function CourseContent() {
 
         setQuizzes(
           (quizRes.data ?? []).map((quiz: any) => ({
-            ...quiz,
-            status: quiz.status === "open" ? "Open" : "Locked",
+            id: quiz.id,
+            title: quiz.title,
             dueDate: quiz.dueDate ?? "",
+            status: quiz.status === "open" ? "Open" : "Locked",
           }))
         );
 
         setStudents(
-          (enrollmentRes.data || []).map((e: any) => e.student).filter(Boolean)
+          (enrollmentRes.data ?? [])
+            .map((e: any) => e.student as Student | null)
+            .filter((s): s is Student => s !== null)
         );
 
         setLessons(
-          (lessonsRes.data || []).map((lesson: any) => ({
-            id: String(lesson.id),
+          (lessonsRes.data ?? []).map((lesson: any) => ({
+            id: lesson.id,
             title: lesson.title,
             fileName: lesson.fileName,
             fileUrl: lesson.fileUrl,
@@ -149,14 +161,15 @@ function CourseContent() {
       }
     };
 
-    if (uuid) fetchData();
+    fetchData();
   }, [uuid, supabase]);
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
+  // Handlers
+  const handleUploadClick = () => fileInputRef.current?.click();
 
-  const handleLessonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLessonUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file || !course || !uuid) return;
 
@@ -164,9 +177,6 @@ function CourseContent() {
       data: { user: liveUser },
       error: userError,
     } = await supabase.auth.getUser();
-
-    console.log("LIVE USER:", liveUser);
-    console.log("USER ERROR:", userError);
 
     if (userError || !liveUser) {
       alert("Authentication error. Please sign in again.");
@@ -180,12 +190,9 @@ function CourseContent() {
       const safeName = file.name.replace(/\s+/g, "_");
       const filePath = `${uuid}/${Date.now()}_${safeName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("lesson-files")
         .upload(filePath, file, { upsert: false });
-
-      console.log("UPLOAD DATA:", uploadData);
-      console.log("UPLOAD ERROR:", uploadError);
 
       if (uploadError) {
         throw new Error(`Storage upload failed: ${uploadError.message}`);
@@ -195,39 +202,26 @@ function CourseContent() {
         data: { publicUrl },
       } = supabase.storage.from("lesson-files").getPublicUrl(filePath);
 
-      const insertPayload = {
-        title: file.name.replace(/\.[^/.]+$/, ""),
-        fileName: file.name,
-        filePath,
-        fileUrl: publicUrl,
-        courseId: uuid,
-        uploadedBy: liveUser.id,
-      };
-
-      console.log("UUID FROM URL:", uuid);
-      console.log("LIVE USER ID:", liveUser.id);
-      console.log("LESSON INSERT PAYLOAD:", insertPayload);
-
-      const { data: insertedData, error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("lessons")
-        .insert([insertPayload])
+        .insert([
+          {
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            fileName: file.name,
+            filePath,
+            fileUrl: publicUrl,
+            courseId: uuid,
+            uploadedBy: liveUser.id,
+          },
+        ])
         .select(`id, title, "fileName", "fileUrl", "filePath"`)
         .single();
-
-      console.log("INSERT DATA:", insertedData);
-      console.log("INSERT ERROR:", insertError);
 
       if (insertError) {
         throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      setLessons((prev) => [
-        {
-          ...(insertedData as Lesson),
-          id: String((insertedData as any).id),
-        },
-        ...prev,
-      ]);
+      setLessons((prev) => [inserted as Lesson, ...prev]);
       alert("Lesson uploaded!");
     } catch (error: any) {
       console.error("Upload failed:", error);
@@ -239,11 +233,9 @@ function CourseContent() {
   };
 
   const handleDeleteLesson = async (lesson: Lesson) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${lesson.title}"?`
-    );
-
-    if (!confirmed) return;
+    if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
+      return;
+    }
 
     try {
       setDeletingLessonId(lesson.id);
@@ -251,8 +243,6 @@ function CourseContent() {
       const { error: storageError } = await supabase.storage
         .from("lesson-files")
         .remove([lesson.filePath]);
-
-      console.log("STORAGE DELETE ERROR:", storageError);
 
       if (storageError) {
         throw new Error(`Storage delete failed: ${storageError.message}`);
@@ -263,14 +253,11 @@ function CourseContent() {
         .delete()
         .eq("id", lesson.id);
 
-      console.log("LESSON DELETE ERROR:", dbError);
-
       if (dbError) {
         throw new Error(`Database delete failed: ${dbError.message}`);
       }
 
       setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
-      alert("Lesson deleted!");
     } catch (error: any) {
       console.error("Delete failed:", error);
       alert(`Delete failed: ${error.message}`);
@@ -278,6 +265,8 @@ function CourseContent() {
       setDeletingLessonId(null);
     }
   };
+
+  // Loading / not-found states 
 
   if (loading) {
     return (
@@ -297,12 +286,13 @@ function CourseContent() {
     );
   }
 
-  return (
+   return (
     <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
+      {/* Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
         <div className="mx-auto flex items-center justify-between">
           <Link
-            href="/home"
+            href="/pages/home"
             className="flex items-center gap-2 transition-transform hover:scale-95"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
@@ -319,11 +309,11 @@ function CourseContent() {
                 Signed in as
               </p>
               <p className="text-sm font-semibold text-zinc-800">
-                {user?.name || "User"}
+                {user?.name ?? "User"}
               </p>
             </div>
             <Link
-              href="/settings"
+              href="/pages/settings"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
             >
               <Settings
@@ -336,6 +326,7 @@ function CourseContent() {
       </header>
 
       <main className="mx-auto space-y-8 px-6 py-12">
+        {/* Course Card */}
         <section className="rounded-3xl bg-zinc-900 p-10 text-white shadow-2xl">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
             <GraduationCap size={14} /> Active Course
@@ -352,7 +343,7 @@ function CourseContent() {
                 <p className="text-[10px] font-bold uppercase opacity-50">
                   Instructor
                 </p>
-                <p className="text-sm font-semibold">{course.teacher}</p>
+                <p className="text-sm font-semibold">{course.instructor}</p>
               </div>
             </div>
 
@@ -365,13 +356,14 @@ function CourseContent() {
                   Schedule
                 </p>
                 <p className="text-sm font-semibold">
-                  {course.startDate} - {course.endDate}
+                  {course.startDate} – {course.endDate}
                 </p>
               </div>
             </div>
           </div>
         </section>
 
+        {/* Enrollment / description */}
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -415,6 +407,7 @@ function CourseContent() {
           )}
         </div>
 
+        {/* Lessons */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -435,13 +428,7 @@ function CourseContent() {
                   disabled={uploading}
                   className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black disabled:opacity-50"
                 >
-                  {uploading ? (
-                    "Uploading..."
-                  ) : (
-                    <>
-                      <Upload size={16} /> Upload Lesson
-                    </>
-                  )}
+                  {uploading ? "Uploading…" : <><Upload size={16} /> Upload Lesson</>}
                 </button>
               </>
             )}
@@ -494,6 +481,7 @@ function CourseContent() {
                           target="_blank"
                           rel="noreferrer"
                           className="text-zinc-300 transition-colors hover:text-zinc-800"
+                          title="Open in new tab"
                         >
                           <ChevronRight size={20} />
                         </a>
@@ -506,6 +494,7 @@ function CourseContent() {
           )}
         </div>
 
+        {/* Quizzes */}
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -513,7 +502,7 @@ function CourseContent() {
             </h2>
             {isTeacher && (
               <Link
-                href={`/quizCreation?courseId=${uuid}`}
+                href={`/pages/quizCreation?courseId=${uuid}`}
                 className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black"
               >
                 <Plus size={16} /> Create Quiz
@@ -538,11 +527,7 @@ function CourseContent() {
                             : "bg-zinc-50 text-zinc-300"
                         }`}
                       >
-                        {isOpen ? (
-                          <FileQuestion size={20} />
-                        ) : (
-                          <Lock size={20} />
-                        )}
+                        {isOpen ? <FileQuestion size={20} /> : <Lock size={20} />}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -579,7 +564,7 @@ function CourseContent() {
                 return isOpen ? (
                   <Link
                     key={quiz.id}
-                    href={`/quiz/${quiz.id}`}
+                    href={`/pages/quiz/${quiz.id}`}
                     className="group block"
                   >
                     {card}

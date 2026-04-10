@@ -13,8 +13,8 @@ import {
   Info,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
-import { useAuth } from "../context/AuthContext";
-import AuthGuard from "../components/AuthGuard";
+import { useAuth } from "../../context/AuthContext";
+import AuthGuard from "../../components/AuthGuard";
 
 function SettingsContent() {
   const supabase = useMemo(
@@ -119,7 +119,7 @@ function SettingsContent() {
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-12 flex items-center justify-between">
-          <Link href="/home" className="group flex items-center gap-3">
+          <Link href="/pages/home" className="group flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 text-[#F5F1E6] transition-transform group-hover:scale-95">
               <BookOpen size={24} />
             </div>

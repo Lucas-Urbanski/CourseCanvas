@@ -16,7 +16,7 @@ export default function AuthGuard({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/signin");
+      router.replace("/pages/signin");
     }
   }, [loading, user, router, pathname]);
 

@@ -12,8 +12,8 @@ import {
   Type,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
-import { useAuth } from "../context/AuthContext";
-import AuthGuard from "../components/AuthGuard";
+import { useAuth } from "../../context/AuthContext";
+import AuthGuard from "../../components/AuthGuard";
 
 function CourseCreationContent() {
   const supabase = useMemo(
@@ -36,7 +36,6 @@ function CourseCreationContent() {
 
   const handleCreateCourse = async () => {
     if (!user) {
-      alert("You must be signed in to create a course.");
       return;
     }
 
@@ -69,7 +68,7 @@ function CourseCreationContent() {
       setStartDate("");
       setEndDate("");
 
-      router.push(`/course/${data.id}`);
+      router.push(`/pages/course/${data.id}`);
     } catch (error: any) {
       console.error("Error creating course:", error);
       alert(error?.message || "Failed to create course.");
@@ -83,7 +82,7 @@ function CourseCreationContent() {
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/70 px-8 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link
-            href="/home"
+            href="/pages/home"
             className="flex items-center gap-2 transition-transform hover:scale-95"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
@@ -99,7 +98,7 @@ function CourseCreationContent() {
           </h1>
 
           <Link
-            href="/settings"
+            href="/pages/settings"
             className="flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 font-bold text-zinc-800 transition hover:bg-zinc-50"
           >
             Settings

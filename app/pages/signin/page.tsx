@@ -39,7 +39,7 @@ export default function SignInPage() {
       return;
     }
 
-    router.replace("/home");
+    router.replace("/pages/home");
     router.refresh();
   };
 
@@ -103,7 +103,7 @@ export default function SignInPage() {
 
         <p className="mt-6 text-center text-sm text-zinc-600">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold text-zinc-800 hover:underline">
+          <Link href="/pages/signup" className="font-semibold text-zinc-800 hover:underline">
             Sign up
           </Link>
         </p>

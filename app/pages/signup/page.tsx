@@ -55,7 +55,7 @@ export default function SignUpPage() {
     }
 
     if (data.session) {
-      router.replace("/home");
+      router.replace("/pages/home");
       router.refresh();
       return;
     }
@@ -188,7 +188,7 @@ export default function SignUpPage() {
         <p className="mt-6 text-center text-sm text-zinc-600">
           Already have an account?{" "}
           <Link
-            href="/signin"
+            href="/pages/signin"
             className="font-semibold text-zinc-800 hover:underline"
           >
             Sign in

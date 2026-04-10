@@ -77,6 +77,9 @@ ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Courses are viewable by everyone"
   ON public.courses FOR SELECT USING (TRUE);
 
+CREATE POLICY "Instructors can manage their own courses"
+  ON public.courses FOR ALL USING (auth.uid() = "instructorId");
+
 CREATE POLICY "Instructors can create their own courses"
 ON public.courses
 FOR INSERT
@@ -88,9 +91,6 @@ WITH CHECK (
     AND role = 'instructor'
   )
 );
-
-CREATE POLICY "Instructors can manage their own courses"
-  ON public.courses FOR ALL USING (auth.uid() = "instructorId");
 
 -- ENROLLMENTS TABLE
 CREATE TABLE IF NOT EXISTS public.enrollments (
@@ -256,5 +256,17 @@ WITH CHECK (
     FROM public.courses
     WHERE courses.id = "courseId"
       AND courses."instructorId" = auth.uid()
+  )
+);
+
+CREATE POLICY "Instructors can create their own quizzes"
+ON public.quizzes
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() 
+    AND role = 'instructor'
   )
 );
