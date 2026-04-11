@@ -37,6 +37,7 @@ type Quiz = {
   title: string;
   dueDate: string;
   status: "Open" | "Locked";
+  published: boolean;
 };
 
 type Student = {
@@ -50,6 +51,7 @@ type Lesson = {
   fileName: string;
   fileUrl: string;
   filePath: string;
+  published: boolean;
 };
 
 // Component
@@ -93,7 +95,7 @@ function CourseContent() {
 
             supabase
               .from("quizzes")
-              .select(`id, title, status, "dueDate"`)
+              .select(`id, title, status, "dueDate", published`)
               .eq("courseId", uuid),
 
             supabase
@@ -104,7 +106,7 @@ function CourseContent() {
             supabase
               .from("lessons")
               .select(
-                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt"`
+                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`
               )
               .eq("courseId", uuid)
               .order("uploadedAt", { ascending: false }),
@@ -136,6 +138,7 @@ function CourseContent() {
             title: quiz.title,
             dueDate: quiz.dueDate ?? "",
             status: quiz.status === "open" ? "Open" : "Locked",
+            published: quiz.published ?? false,
           }))
         );
 
@@ -152,6 +155,7 @@ function CourseContent() {
             fileName: lesson.fileName,
             fileUrl: lesson.fileUrl,
             filePath: lesson.filePath,
+            published: lesson.published ?? false,
           }))
         );
       } catch (err) {
@@ -212,9 +216,10 @@ function CourseContent() {
             fileUrl: publicUrl,
             courseId: uuid,
             uploadedBy: liveUser.id,
+            published: false,
           },
         ])
-        .select(`id, title, "fileName", "fileUrl", "filePath"`)
+        .select(`id, title, "fileName", "fileUrl", "filePath", published`)
         .single();
 
       if (insertError) {
@@ -266,7 +271,52 @@ function CourseContent() {
     }
   };
 
-  // Loading / not-found states 
+  const handleToggleLessonPublish = async (lesson: Lesson) => {
+    try {
+      const { error } = await supabase
+        .from("lessons")
+        .update({ published: !lesson.published })
+        .eq("id", lesson.id);
+
+      if (error) {
+        throw new Error(`Lesson update failed: ${error.message}`);
+      }
+
+      setLessons((prev) =>
+        prev.map((l) =>
+          l.id === lesson.id ? { ...l, published: !l.published } : l
+        )
+      );
+    } catch (error: any) {
+      console.error("Lesson publish toggle failed:", error);
+      alert(error.message);
+    }
+  };
+
+  const handleToggleQuizPublish = async (quiz: Quiz) => {
+    try {
+      const nextPublished = !quiz.published;
+      const { error } = await supabase
+        .from("quizzes")
+        .update({ published: nextPublished })
+        .eq("id", quiz.id);
+
+      if (error) {
+        throw new Error(`Quiz update failed: ${error.message}`);
+      }
+
+      setQuizzes((prev) =>
+        prev.map((q) =>
+          q.id === quiz.id ? { ...q, published: nextPublished } : q
+        )
+      );
+    } catch (error: any) {
+      console.error("Quiz publish toggle failed:", error);
+      alert(error.message);
+    }
+  };
+
+  // Loading / not-found states
 
   if (loading) {
     return (
@@ -286,7 +336,15 @@ function CourseContent() {
     );
   }
 
-   return (
+  const visibleLessons = isTeacher
+    ? lessons
+    : lessons.filter((lesson) => lesson.published);
+
+  const visibleQuizzes = isTeacher
+    ? quizzes
+    : quizzes.filter((quiz) => quiz.published);
+
+  return (
     <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
@@ -434,13 +492,13 @@ function CourseContent() {
             )}
           </div>
 
-          {lessons.length === 0 ? (
+          {visibleLessons.length === 0 ? (
             <p className="py-12 text-center text-zinc-400">
-              No lessons uploaded yet.
+              No lessons available.
             </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {lessons.map((lesson) => (
+              {visibleLessons.map((lesson) => (
                 <div key={lesson.id} className="group block">
                   <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
                     <div className="flex items-start justify-between gap-4">
@@ -454,9 +512,22 @@ function CourseContent() {
                           <FileText size={20} />
                         </div>
                         <div className="min-w-0 max-w-[150px] sm:max-w-full">
-                          <h3 className="truncate text-lg font-bold group-hover:text-black">
-                            {lesson.title}
-                          </h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate text-lg font-bold group-hover:text-black">
+                              {lesson.title}
+                            </h3>
+                            {isTeacher && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  lesson.published
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-zinc-100 text-zinc-500"
+                                }`}
+                              >
+                                {lesson.published ? "Published" : "Hidden"}
+                              </span>
+                            )}
+                          </div>
                           <p className="truncate text-xs text-zinc-500">
                             {lesson.fileName}
                           </p>
@@ -465,15 +536,30 @@ function CourseContent() {
 
                       <div className="flex items-center gap-2">
                         {isTeacher && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLesson(lesson)}
-                            disabled={deletingLessonId === lesson.id}
-                            className="rounded-lg p-2 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                            title="Delete lesson"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLessonPublish(lesson)}
+                              className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                                lesson.published
+                                  ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                              }`}
+                              title={lesson.published ? "Unpublish lesson" : "Publish lesson"}
+                            >
+                              {lesson.published ? "Unpublish" : "Publish"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLesson(lesson)}
+                              disabled={deletingLessonId === lesson.id}
+                              className="rounded-lg p-2 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              title="Delete lesson"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
                         )}
 
                         <a
@@ -510,11 +596,11 @@ function CourseContent() {
             )}
           </div>
 
-          {quizzes.length === 0 ? (
-            <p className="py-12 text-center text-zinc-400">No quizzes yet.</p>
+          {visibleQuizzes.length === 0 ? (
+            <p className="py-12 text-center text-zinc-400">No quizzes available.</p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {quizzes.map((quiz) => {
+              {visibleQuizzes.map((quiz) => {
                 const isOpen = quiz.status === "Open";
 
                 const card = (
@@ -543,6 +629,17 @@ function CourseContent() {
                           >
                             {quiz.status}
                           </span>
+                          {isTeacher && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                quiz.published
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-zinc-100 text-zinc-500"
+                              }`}
+                            >
+                              {quiz.published ? "Published" : "Hidden"}
+                            </span>
+                          )}
                         </div>
                         {quiz.dueDate && (
                           <p className="text-sm text-zinc-500">
@@ -552,12 +649,29 @@ function CourseContent() {
                       </div>
                     </div>
 
-                    {isOpen && (
-                      <ChevronRight
-                        size={20}
-                        className="text-zinc-300 transition-colors group-hover:text-zinc-800"
-                      />
-                    )}
+                    <div className="flex items-center gap-2">
+                      {isTeacher && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleQuizPublish(quiz)}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            quiz.published
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
+                              : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                          }`}
+                          title={quiz.published ? "Unpublish quiz" : "Publish quiz"}
+                        >
+                          {quiz.published ? "Unpublish" : "Publish"}
+                        </button>
+                      )}
+
+                      {isOpen && (
+                        <ChevronRight
+                          size={20}
+                          className="text-zinc-300 transition-colors group-hover:text-zinc-800"
+                        />
+                      )}
+                    </div>
                   </div>
                 );
 
