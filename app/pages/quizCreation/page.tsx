@@ -65,6 +65,7 @@ function QuizCreationContent() {
     if (!title.trim()) return alert("Please enter a quiz title.");
     if (!dueDate) return alert("You must have a due date.");
     if (!courseId) return alert("Course ID missing. Please reload the course page.");
+    if (Object.keys(answers).length != questions.length) return alert ("One or more of the Questions don't have answer");
 
     try {
       const finalQuestions = questions.map((q) => ({
