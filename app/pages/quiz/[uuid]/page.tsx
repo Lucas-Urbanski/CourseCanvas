@@ -36,19 +36,55 @@ function QuizContent() {
     () =>
       createBrowserClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       ),
-    [],
+    []
   );
 
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [quizLocked, setQuizLocked] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!uuid || !user?.id) return;
+
       setLoading(true);
+
       try {
+        // 1. Check if student already has a grade for this quiz
+        const { data: existingGrade, error: gradeCheckError } = await supabase
+          .from("grades")
+          .select(`quizId`)
+          .eq("quizId", uuid)
+          .eq("studentId", user.id)
+          .maybeSingle();
+
+        if (gradeCheckError) {
+          console.error("GRADE CHECK ERROR:", gradeCheckError);
+        }
+
+        // 2. Check quiz attempts
+        const { data: existingAttempt, error: attemptError } = await supabase
+          .from("quiz_attempts")
+          .select(`id, submitted`)
+          .eq("quizId", uuid)
+          .eq("studentId", user.id)
+          .maybeSingle();
+
+        if (attemptError) {
+          console.error("ATTEMPT CHECK ERROR:", attemptError);
+        }
+
+        // 3. If either one exists, lock the quiz
+        if (existingGrade || existingAttempt?.submitted) {
+          setQuizLocked(true);
+          setLoading(false);
+          return;
+        }
+
+        // 4. Load quiz
         const { data, error } = await supabase
           .from("quizzes")
           .select(`id, title, "courseId", questions`)
@@ -56,7 +92,28 @@ function QuizContent() {
           .single();
 
         if (error) throw error;
+
         setQuiz(data as Quiz);
+
+        // 5. Ensure attempt row exists
+        if (!existingAttempt) {
+          const { error: insertAttemptError } = await supabase
+            .from("quiz_attempts")
+            .upsert(
+              [
+                {
+                  quizId: uuid,
+                  studentId: user.id,
+                  submitted: false,
+                },
+              ],
+              { onConflict: "quizId,studentId" }
+            );
+
+          if (insertAttemptError) {
+            console.error("INSERT ATTEMPT ERROR:", insertAttemptError);
+          }
+        }
       } catch (error) {
         console.error("Error fetching quiz:", error);
         setQuiz(null);
@@ -65,12 +122,11 @@ function QuizContent() {
       }
     };
 
-    if (uuid) fetchData();
-  }, [uuid, supabase]);
+    fetchData();
+  }, [uuid, user?.id, supabase]);
 
-  // Load saved answers when quiz data arrives
   useEffect(() => {
-    if (!uuid) return;
+    if (!uuid || quizLocked) return;
     const saved = localStorage.getItem(`quiz-answers-${uuid}`);
     if (saved) {
       try {
@@ -79,40 +135,65 @@ function QuizContent() {
         localStorage.removeItem(`quiz-answers-${uuid}`);
       }
     }
-  }, [uuid]);
+  }, [uuid, quizLocked]);
 
-  // Save answers to local storage
   useEffect(() => {
-    if (!uuid || Object.keys(answers).length === 0) return;
+    if (!uuid || Object.keys(answers).length === 0 || quizLocked) return;
     localStorage.setItem(`quiz-answers-${uuid}`, JSON.stringify(answers));
-  }, [answers, uuid]);
+  }, [answers, uuid, quizLocked]);
 
   let grade = 0;
+
   const calculateGrade = () => {
     let numberOfCorrectAnswers = 0;
+
     quiz?.questions?.forEach((q) => {
       if (answers[q.id] === q.correctAnswer) {
         numberOfCorrectAnswers++;
       }
     });
-    if (quiz?.questions?.length === null) return;
-    grade = (numberOfCorrectAnswers / (quiz?.questions?.length ?? 0)) * 100;
+
+    grade = (numberOfCorrectAnswers / (quiz?.questions?.length ?? 1)) * 100;
     grade = Math.round(grade * 100) / 100;
   };
 
   const handleGrading = async () => {
     calculateGrade();
+
     try {
-      const { error } = await supabase.from("grades").insert({
+      // 1. Save grade
+      const { error: gradeError } = await supabase.from("grades").insert({
         studentId: user?.id,
         quizId: quiz?.id,
         courseId: quiz?.courseId,
         score: grade,
       });
-      if (error) throw error;
+
+      if (gradeError) throw gradeError;
+
+      // 2. Mark attempt as submitted
+      const { error: attemptUpdateError } = await supabase
+        .from("quiz_attempts")
+        .upsert(
+          [
+            {
+              quizId: quiz?.id,
+              studentId: user?.id,
+              submitted: true,
+              score: grade,
+              submittedAt: new Date().toISOString(),
+            },
+          ],
+          { onConflict: "quizId,studentId" }
+        );
+
+      if (attemptUpdateError) throw attemptUpdateError;
+
+      return true;
     } catch (error: any) {
-      alert(error.message ?? "Error creating grade");
-      console.error("Error creating grade:", error);
+      alert(error.message ?? "Error submitting quiz");
+      console.error("Error submitting quiz:", error);
+      return false;
     }
   };
 
@@ -134,6 +215,26 @@ function QuizContent() {
     );
   }
 
+  if (quizLocked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F1E6] px-6 text-zinc-800">
+        <div className="w-full max-w-xl rounded-3xl border border-zinc-200 bg-white p-10 text-center shadow-sm">
+          <h1 className="text-3xl font-bold">Quiz Already Completed</h1>
+          <p className="mt-3 text-zinc-600">
+            You have already completed this quiz and cannot enter it again.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/pages/home")}
+            className="mt-6 rounded-2xl bg-zinc-900 px-6 py-3 font-bold text-[#F5F1E6] transition hover:bg-black"
+          >
+            Back to Home
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   if (!quiz) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F1E6] text-zinc-500">
@@ -146,7 +247,6 @@ function QuizContent() {
 
   return (
     <main className="min-h-screen bg-[#F5F1E6] text-zinc-800 flex">
-      {/* Sidebar */}
       <aside className="sticky top-0 z-20 flex h-screen w-20 flex-col items-center gap-6 border-r border-zinc-200 bg-white/80 py-10 backdrop-blur-md md:w-24">
         {questions.map((q, index) => {
           const isAnswered = !!answers[q.id];
@@ -178,7 +278,6 @@ function QuizContent() {
         })}
       </aside>
 
-      {/* Questions */}
       <div className="flex flex-1 flex-col items-center px-6 py-12 md:px-12">
         <div className="w-full max-w-4xl space-y-12">
           {questions.map((q, index) => (
@@ -218,6 +317,7 @@ function QuizContent() {
                   return (
                     <button
                       key={letter}
+                      type="button"
                       onClick={() => handleSelect(q.id, letter)}
                       className={`flex items-start text-left gap-4 p-6 rounded-2xl border transition-all active:scale-95 group ${
                         isSelected
@@ -235,7 +335,9 @@ function QuizContent() {
                         {letter}
                       </span>
                       <span
-                        className={`font-medium pt-1 leading-relaxed ${isSelected ? "text-zinc-100" : "text-zinc-700"}`}
+                        className={`font-medium pt-1 leading-relaxed ${
+                          isSelected ? "text-zinc-100" : "text-zinc-700"
+                        }`}
                       >
                         {q[letter]}
                       </span>
@@ -252,9 +354,12 @@ function QuizContent() {
             </p>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (Object.keys(answers).length !== questions.length) return;
-                handleGrading();
+
+                const success = await handleGrading();
+                if (!success) return;
+
                 localStorage.removeItem(`quiz-answers-${uuid}`);
                 router.push(`/pages/course/${quiz.courseId}`);
               }}
@@ -268,11 +373,6 @@ function QuizContent() {
               Submit Quiz
               <CheckCircle2 size={20} />
             </button>
-            {quiz?.questions?.length === null && (
-              <p className="text-red-500">
-                Quiz not found, go back to the course page and reenter the quiz.
-              </p>
-            )}
           </div>
         </div>
       </div>
