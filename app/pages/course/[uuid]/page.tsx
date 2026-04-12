@@ -653,13 +653,16 @@ function CourseContent() {
                       {isTeacher && (
                         <button
                           type="button"
-                          onClick={() => handleToggleQuizPublish(quiz)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleQuizPublish(quiz);
+                          }}
                           className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
                             quiz.published
                               ? "bg-green-100 text-green-700 hover:bg-green-200"
                               : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                           }`}
-                          title={quiz.published ? "Unpublish quiz" : "Publish quiz"}
                         >
                           {quiz.published ? "Unpublish" : "Publish"}
                         </button>
