@@ -43,39 +43,26 @@ function HomeContent() {
   const [search, setSearch] = useState("");
 
   const computeCompletedIds = useCallback(
-    async (rawCourses: any[], enrolledIds: string[]): Promise<Set<string>> => {
-      if (enrolledIds.length === 0) return new Set();
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const pastCourseIds = enrolledIds.filter((id) => {
-        const raw = rawCourses.find((c) => c.id === id);
-        if (!raw?.endDate) return false;
-        const ended = new Date(raw.endDate);
-        ended.setHours(0, 0, 0, 0);
-        return ended <= today;
-      });
-
-      if (pastCourseIds.length === 0) return new Set();
+    async (rawCourses: any[], courseIdsToCheck: string[]): Promise<Set<string>> => {
+      if (courseIdsToCheck.length === 0) return new Set();
 
       const [{ data: quizData }, { data: gradeData }] = await Promise.all([
         supabase
           .from("quizzes")
           .select("id, courseId")
           .eq("published", true)
-          .in("courseId", pastCourseIds),
+          .in("courseId", courseIdsToCheck),
         supabase
           .from("grades")
           .select("quizId")
           .eq("studentId", user!.id)
-          .in("courseId", pastCourseIds),
+          .in("courseId", courseIdsToCheck),
       ]);
 
       const gradedQuizIds = new Set((gradeData ?? []).map((g: any) => g.quizId));
 
       return new Set(
-        pastCourseIds.filter((courseId) => {
+        courseIdsToCheck.filter((courseId) => {
           const quizIds = (quizData ?? [])
             .filter((q: any) => q.courseId === courseId)
             .map((q: any) => q.id);
@@ -110,16 +97,31 @@ function HomeContent() {
         if (enrollError) throw enrollError;
 
         let enrolledIds = (enrollments ?? []).map((e: any) => e.courseId);
-        const completedIds = await computeCompletedIds(data ?? [], enrolledIds);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const allPastCourseIds = (data ?? [])
+          .filter((c: any) => {
+            if (!c.endDate) return false;
+            const ended = new Date(c.endDate);
+            ended.setHours(0, 0, 0, 0);
+            return ended <= today;
+          })
+          .map((c: any) => c.id);
+
+        const completedIds = await computeCompletedIds(data ?? [], allPastCourseIds);
 
         if (completedIds.size > 0) {
-          const completedArr = [...completedIds];
-          await supabase
-            .from("enrollments")
-            .delete()
-            .eq("studentId", user.id)
-            .in("courseId", completedArr);
-
+          const stillEnrolledAndCompleted = enrolledIds.filter((id) =>
+            completedIds.has(id),
+          );
+          if (stillEnrolledAndCompleted.length > 0) {
+            await supabase
+              .from("enrollments")
+              .delete()
+              .eq("studentId", user.id)
+              .in("courseId", stillEnrolledAndCompleted);
+          }
           enrolledIds = enrolledIds.filter((id) => !completedIds.has(id));
         }
 
@@ -182,7 +184,17 @@ function HomeContent() {
       }
 
       const newEnrolledIds = [...enrolledCourseIds, courseId];
-      const completedIds = await computeCompletedIds(courses, newEnrolledIds);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allPastCourseIds = courses
+        .filter((c) => {
+          if (!c.endDate) return false;
+          const ended = new Date(c.endDate);
+          ended.setHours(0, 0, 0, 0);
+          return ended <= today;
+        })
+        .map((c) => c.id);
+      const completedIds = await computeCompletedIds(courses, allPastCourseIds);
 
       setEnrolledCourseIds(new Set(newEnrolledIds));
       setCourses((prev) =>
@@ -209,7 +221,17 @@ function HomeContent() {
       if (error) throw error;
 
       const newEnrolledIds = [...enrolledCourseIds].filter((id) => id !== courseId);
-      const completedIds = await computeCompletedIds(courses, newEnrolledIds);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allPastCourseIds = courses
+        .filter((c) => {
+          if (!c.endDate) return false;
+          const ended = new Date(c.endDate);
+          ended.setHours(0, 0, 0, 0);
+          return ended <= today;
+        })
+        .map((c) => c.id);
+      const completedIds = await computeCompletedIds(courses, allPastCourseIds);
 
       setEnrolledCourseIds(new Set(newEnrolledIds));
       setCourses((prev) =>
@@ -359,7 +381,7 @@ function HomeContent() {
               </div>
             )}
 
-            {/* TEACHER VIEW */}
+            {/* Teacher view */}
             {isTeacher && (
               <>
                 <section className="space-y-4">
@@ -402,10 +424,10 @@ function HomeContent() {
               </>
             )}
 
-            {/* ── STUDENT VIEW ─────────────────────────────── */}
+            {/* Student View */}
             {!isTeacher && (
               <>
-                {/* Completed Courses — amber section, no unenroll button */}
+                {/* Completed Courses — amber section, certificate modal on click */}
                 {filteredCompleted.length > 0 && (
                   <section className="space-y-4">
                     <div className="flex items-center justify-between px-1">
