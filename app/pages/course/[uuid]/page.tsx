@@ -76,7 +76,7 @@ function CourseContent() {
     localStorage.setItem("courseid", course?.id ?? "null");
   }, [course?.id]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!uuid) return;
 
     const fetchData = async () => {
@@ -155,8 +155,8 @@ function CourseContent() {
         );
 
         setQuizzes(
-          (quizData ?? []).map((quiz: any) => ({
-            id: quiz.id,
+          (quizData ?? []).map((quiz: any, index: number) => ({
+            id: String(quiz.id ?? `quiz-${index}`),
             title: quiz.title,
             dueDate: quiz.dueDate ?? "",
             published: quiz.published ?? false,
@@ -166,13 +166,21 @@ function CourseContent() {
 
         setStudents(
           (enrollmentData ?? [])
-            .map((e: any) => e.student as Student | null)
+            .map((e: any, index: number) => {
+              const student = e.student as Student | null;
+              if (!student) return null;
+
+              return {
+                ...student,
+                id: String(student.id ?? `student-${index}`),
+              };
+            })
             .filter((s): s is Student => s !== null)
         );
 
         setLessons(
-          (lessonData ?? []).map((lesson: any) => ({
-            id: lesson.id,
+          (lessonData ?? []).map((lesson: any, index: number) => ({
+            id: String(lesson.id ?? `lesson-${index}`),
             title: lesson.title,
             fileName: lesson.fileName,
             fileUrl: lesson.fileUrl,
@@ -248,7 +256,13 @@ function CourseContent() {
         throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      setLessons((prev) => [inserted as Lesson, ...prev]);
+      setLessons((prev) => [
+        {
+          ...(inserted as Lesson),
+          id: String((inserted as any).id),
+        },
+        ...prev,
+      ]);
       alert("Lesson uploaded!");
     } catch (error: any) {
       console.error("Upload failed:", error);
@@ -701,23 +715,19 @@ function CourseContent() {
                 );
 
                 return quiz.published ? (
-                  <div>
-                  {isTeacher ? (
-                  <div key={quiz.id} className="block">
-                    {card}
-                  </div>)
-                  : (<Link
-                    key={quiz.id}
-                    href={`/pages/quiz/${quiz.id}`}
-                return isOpen ? (
-                  <Link
-                    key={quiz.id}
-                    href={`/pages/quiz/${quiz.id}`}
-                    className="group block"
-                  >
-                    {card}
-                  </Link>)}
-                  </div>
+                  isTeacher ? (
+                    <div key={quiz.id} className="block">
+                      {card}
+                    </div>
+                  ) : (
+                    <Link
+                      key={quiz.id}
+                      href={`/pages/quiz/${quiz.id}`}
+                      className="group block"
+                    >
+                      {card}
+                    </Link>
+                  )
                 ) : (
                   <div key={quiz.id} className="block">
                     {card}
