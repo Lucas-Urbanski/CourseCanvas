@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { BookOpen, LogIn } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
 export default function SignInPage() {
+  const router = useRouter();
   const supabase = createClient();
 
   const [email, setEmail] = useState("");
