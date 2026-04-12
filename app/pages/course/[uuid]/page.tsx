@@ -347,6 +347,7 @@ function CourseContent() {
         .update({ published: !quiz.published })
         .eq("id", quiz.id);
       if (error) throw error;
+      const nextPublished = !quiz.published;
       setQuizzes((prev) =>
         prev.map((q) =>
           q.id === quiz.id ? { ...q, published: nextPublished } : q,
@@ -659,12 +660,12 @@ function CourseContent() {
                     <div className="flex items-center gap-4">
                       <div
                         className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
-                          isOpen
+                          quiz.published
                             ? "bg-zinc-100 text-zinc-800"
                             : "bg-zinc-50 text-zinc-300"
                         }`}
                       >
-                        {isOpen ? (
+                        {quiz.published ? (
                           <FileQuestion size={20} />
                         ) : (
                           <Lock size={20} />
