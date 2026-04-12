@@ -92,9 +92,6 @@ function CourseContent() {
   const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(
     null,
   );
-  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(
-    null,
-  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -126,7 +123,7 @@ function CourseContent() {
                 `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
               )
               .eq("courseId", uuid)
-              .order('"uploadedAt"', { ascending: false }),
+              .order("uploadedAt", { ascending: false }),
             supabase
               .from("grades")
               .select(`score, "studentId", "quizId", "courseId"`)
@@ -145,7 +142,6 @@ function CourseContent() {
           id: raw.id,
           name: raw.title,
           description: raw.description ?? "",
-          // FIX 2: read instructorId from the course row, not the profiles join
           instructorId: raw.instructorId ?? "",
           instructor: raw.profiles?.fullName ?? "Unknown Instructor",
           startDate: raw.startDate ?? "",
@@ -154,7 +150,7 @@ function CourseContent() {
 
         setQuizzes(
           (quizRes.data ?? []).map((q: any) => ({
-            id: q.id,
+            id: String(q.id),
             title: q.title,
             dueDate: q.dueDate ?? "",
             timeLimit: q.timeLimit ?? 10000,
@@ -170,7 +166,7 @@ function CourseContent() {
 
         setLessons(
           (lessonsRes.data ?? []).map((l: any) => ({
-            id: l.id,
+            id: String(l.id),
             title: l.title,
             fileName: l.fileName,
             fileUrl: l.fileUrl,
@@ -246,7 +242,13 @@ function CourseContent() {
       if (insertError)
         throw new Error(`Database insert failed: ${insertError.message}`);
 
-      setLessons((prev) => [inserted as Lesson, ...prev]);
+      setLessons((prev) => [
+        {
+          ...(inserted as Lesson),
+          id: String((inserted as any).id),
+        },
+        ...prev,
+      ]);
     } catch (err: any) {
       console.error("Upload failed:", err);
       setActionError(err.message || "Upload failed.");
@@ -257,30 +259,43 @@ function CourseContent() {
   };
 
   const handleDeleteLesson = async (lesson: Lesson) => {
-    if (pendingDeleteLesson !== lesson.id) {
-      setPendingDeleteLesson(lesson.id);
+    if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
       return;
     }
 
     setActionError(null);
+
     try {
       setDeletingLessonId(lesson.id);
+
+      const { data: dbData, error: dbError } = await supabase
+        .from("lessons")
+        .delete()
+        .eq("id", Number(lesson.id))
+        .select();
+
+      console.log("DB DELETE DATA:", dbData);
+      console.log("DB DELETE ERROR:", dbError);
+
+      if (dbError) {
+        throw new Error(`Database delete failed: ${dbError.message}`);
+      }
+
+      if (!dbData || dbData.length === 0) {
+        throw new Error("Lesson was not deleted from the database.");
+      }
 
       const { error: storageError } = await supabase.storage
         .from("lesson-files")
         .remove([lesson.filePath]);
-      if (storageError)
-        throw new Error(`Storage delete failed: ${storageError.message}`);
 
-      const { error: dbError } = await supabase
-        .from("lessons")
-        .delete()
-        .eq("id", lesson.id);
-      if (dbError)
-        throw new Error(`Database delete failed: ${dbError.message}`);
+      console.log("STORAGE DELETE ERROR:", storageError);
+
+      if (storageError) {
+        throw new Error(`Storage delete failed: ${storageError.message}`);
+      }
 
       setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
-      setPendingDeleteLesson(null);
     } catch (err: any) {
       console.error("Delete failed:", err);
       setActionError(err.message || "Delete failed.");
@@ -295,7 +310,7 @@ function CourseContent() {
       const { error } = await supabase
         .from("lessons")
         .update({ published: !lesson.published })
-        .eq("id", lesson.id);
+        .eq("id", Number(lesson.id));
       if (error) throw error;
       setLessons((prev) =>
         prev.map((l) =>
@@ -379,7 +394,6 @@ function CourseContent() {
 
   return (
     <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
-      {/* Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
         <div className="mx-auto flex items-center justify-between">
           <Link
@@ -416,7 +430,6 @@ function CourseContent() {
       </header>
 
       <main className="mx-auto space-y-8 px-6 py-12">
-        {/* Course Hero */}
         <section className="rounded-3xl bg-zinc-900 p-10 text-white shadow-2xl">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
             <GraduationCap size={14} /> Active Course
@@ -452,14 +465,12 @@ function CourseContent() {
           </div>
         </section>
 
-        {/* Error banner */}
         {actionError && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {actionError}
           </div>
         )}
 
-        {/* Enrollment / About */}
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -502,7 +513,6 @@ function CourseContent() {
           )}
         </div>
 
-        {/* Lessons */}
         <div className="w-full space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -580,12 +590,8 @@ function CourseContent() {
                             type="button"
                             onClick={() => handleDeleteLesson(l)}
                             disabled={deletingLessonId === l.id}
-                            className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteLesson === l.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
-                            title={
-                              pendingDeleteLesson === l.id
-                                ? "Click again to confirm"
-                                : "Delete lesson"
-                            }
+                            className="rounded-lg p-2 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            title="Delete lesson"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -607,7 +613,6 @@ function CourseContent() {
           )}
         </div>
 
-        {/* Quizzes */}
         <div className="w-full space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -672,11 +677,11 @@ function CourseContent() {
                             type="button"
                             onClick={() => handleDeleteQuiz(q)}
                             disabled={deletingQuizId === q.id}
-                            className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteLesson === q.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
+                            className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteQuiz === q.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
                             title={
                               pendingDeleteQuiz === q.id
                                 ? "Click again to confirm"
-                                : "Delete lesson"
+                                : "Delete quiz"
                             }
                           >
                             <Trash2 size={18} />
