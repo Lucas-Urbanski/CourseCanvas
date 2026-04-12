@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Plus,
   Upload,
-  GraduationCap,
+  Info,
   Lock,
   FileText,
   Users,
@@ -471,7 +471,11 @@ function CourseContent() {
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-lg font-bold">
-              <Users size={20} className="text-zinc-400" />
+              {isTeacher ? (
+                <Users size={20} className="text-zinc-400" />
+              ) : (
+                <Info size={20} className="text-zinc-400" />
+              )}
               {isTeacher ? "Class Enrollment" : "About This Course"}
             </h3>
             {isTeacher && (
@@ -704,16 +708,16 @@ function CourseContent() {
 
                 return q.published ? (
                   <div key={q.id}>
-                  {isTeacher ? (
-                  <div className="block">
-                    {card}
-                  </div>)
-                  : (<Link
-                    href={`/pages/quiz/${q.id}`}
-                    className="group block"
-                  >
-                    {card}
-                  </Link>)}
+                    {isTeacher ? (
+                      <div className="block">{card}</div>
+                    ) : (
+                      <Link
+                        href={`/pages/quiz/${q.id}`}
+                        className="group block"
+                      >
+                        {card}
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <div key={q.id} className="block">
