@@ -89,12 +89,8 @@ function CourseContent() {
   const [uploading, setUploading] = useState(false);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
-  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(
-    null,
-  );
-  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(
-    null,
-  );
+  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(null);
+  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,106 +105,88 @@ function CourseContent() {
           .eq("id", uuid)
           .single();
 
-        if (courseError) {
-          console.error("COURSE ERROR:", courseError);
-          throw courseError;
-        }
+        if (courseError) throw courseError;
 
         let instructorName = "Unknown Instructor";
-
         if (courseData?.instructorId) {
-          const { data: profileData, error: profileError } = await supabase
+          const { data: profileData } = await supabase
             .from("profiles")
             .select(`"fullName"`)
             .eq("id", courseData.instructorId)
             .single();
-
-          if (profileError) {
-            console.error("PROFILE ERROR:", profileError);
-          } else {
-            instructorName = profileData?.fullName ?? "Unknown Instructor";
-          }
+          instructorName = profileData?.fullName ?? "Unknown Instructor";
         }
 
-        const { data: quizData, error: quizError } = await supabase
-          .from("quizzes")
-          .select(`id, title, "dueDate", published`)
-          .eq("courseId", uuid);
+        const [quizRes, enrollmentRes, lessonRes, gradeRes] = await Promise.all([
+          supabase
+            .from("quizzes")
+            .select(`id, title, timeLimit, "dueDate", published`)
+            .eq("courseId", uuid),
+          supabase
+            .from("enrollments")
+            .select(`student:studentId (id, "fullName")`)
+            .eq("courseId", uuid),
+          supabase
+            .from("lessons")
+            .select(`id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`)
+            .eq("courseId", uuid)
+            .order('"uploadedAt"', { ascending: false }),
+          supabase
+            .from("grades")
+            .select(`score, "studentId", "quizId", "courseId"`)
+            .eq("courseId", uuid)
+            .eq("studentId", user?.id),
+        ]);
 
-        if (quizError) {
-          console.error("QUIZ ERROR:", quizError);
-          throw quizError;
-        }
+        if (quizRes.error) throw quizRes.error;
+        if (enrollmentRes.error) throw enrollmentRes.error;
+        if (lessonRes.error) throw lessonRes.error;
+        if (gradeRes.error) throw gradeRes.error;
 
-        const { data: enrollmentData, error: enrollmentError } = await supabase
-          .from("enrollments")
-          .select(`student:studentId (id, "fullName")`)
-          .eq("courseId", uuid);
-
-        if (enrollmentError) {
-          console.error("ENROLLMENT ERROR:", enrollmentError);
-          throw enrollmentError;
-        }
-
-        const { data: lessonData, error: lessonError } = await supabase
-          .from("lessons")
-          .select(`id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`)
-          .eq("courseId", uuid)
-          .order("uploadedAt", { ascending: false });
-
-        if (lessonError) {
-          console.error("LESSON ERROR:", lessonError);
-          throw lessonError;
-        }
-
-        setCourse(
-          courseData
-            ? {
-                id: courseData.id,
-                name: courseData.title,
-                description: courseData.description ?? "",
-                instructorId: courseData.instructorId ?? "",
-                instructor: instructorName,
-                startDate: courseData.startDate ?? "",
-                endDate: courseData.endDate ?? "",
-              }
-            : null,
-        );
+        setCourse({
+          id: courseData.id,
+          name: courseData.title,
+          description: courseData.description ?? "",
+          instructorId: courseData.instructorId ?? "",
+          instructor: instructorName,
+          startDate: courseData.startDate ?? "",
+          endDate: courseData.endDate ?? "",
+        });
 
         setQuizzes(
-          (quizData ?? []).map((quiz: any, index: number) => ({
-            id: String(quiz.id ?? `quiz-${index}`),
-            title: quiz.title,
-            dueDate: quiz.dueDate ?? "",
-            timeLimit: 0,
-            published: quiz.published ?? false,
-            status: "Open",
-          }))
+          (quizRes.data ?? []).map((q: any) => ({
+            id: String(q.id),
+            title: q.title,
+            dueDate: q.dueDate ?? "",
+            timeLimit: q.timeLimit ?? 0,
+            published: q.published ?? false,
+          })),
         );
 
         setStudents(
-          (enrollmentData ?? [])
-            .map((e: any, index: number) => {
-              const student = e.student as Student | null;
-              if (!student) return null;
-
-              return {
-                ...student,
-                id: String(student.id ?? `student-${index}`),
-              };
-            })
-            .filter((s): s is Student => s !== null)
+          (enrollmentRes.data ?? [])
+            .map((e: any) => e.student as Student | null)
+            .filter((s): s is Student => s !== null),
         );
 
         setLessons(
-          (lessonData ?? []).map((lesson: any, index: number) => ({
-            id: String(lesson.id ?? `lesson-${index}`),
-            title: lesson.title,
-            fileName: lesson.fileName,
-            fileUrl: lesson.fileUrl,
-            filePath: lesson.filePath,
-            published: lesson.published ?? false,
-          }))
+          (lessonRes.data ?? []).map((l: any) => ({
+            id: String(l.id),
+            title: l.title,
+            fileName: l.fileName,
+            fileUrl: l.fileUrl,
+            filePath: l.filePath,
+            published: l.published ?? false,
+          })),
+        );
+
+        setGrades(
+          (gradeRes.data ?? []).map((g: any) => ({
+            studentId: g.studentId,
+            quizId: g.quizId,
+            courseId: g.courseId,
+            score: g.score,
+          })),
         );
       } catch (err) {
         console.error("Fetch failed:", err);
@@ -269,17 +247,10 @@ function CourseContent() {
       if (insertError)
         throw new Error(`Database insert failed: ${insertError.message}`);
 
-      setLessons((prev) => [
-        {
-          ...(inserted as Lesson),
-          id: String((inserted as any).id),
-        },
-        ...prev,
-      ]);
-      alert("Lesson uploaded!");
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      alert(`Upload failed: ${error.message}`);
+      setLessons((prev) => [{ ...(inserted as Lesson), id: String((inserted as any).id) }, ...prev]);
+    } catch (err: any) {
+      console.error("Upload failed:", err);
+      setActionError(err.message || "Upload failed.");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -372,10 +343,9 @@ function CourseContent() {
         .update({ published: !quiz.published })
         .eq("id", quiz.id);
       if (error) throw error;
-      const nextPublished = !quiz.published;
       setQuizzes((prev) =>
         prev.map((q) =>
-          q.id === quiz.id ? { ...q, published: nextPublished } : q,
+          q.id === quiz.id ? { ...q, published: !q.published } : q,
         ),
       );
     } catch (err: any) {
@@ -386,9 +356,7 @@ function CourseContent() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F5F1E6]">
-        <div className="animate-pulse font-bold text-zinc-400">
-          Loading Course...
-        </div>
+        <div className="animate-pulse font-bold text-zinc-400">Loading Course...</div>
       </div>
     );
   }
@@ -401,377 +369,297 @@ function CourseContent() {
     );
   }
 
-  const visibleLessons = isTeacher
-    ? lessons
-    : lessons.filter((l) => l.published);
-  const visibleQuizzes = isTeacher
-    ? quizzes
-    : quizzes.filter((q) => q.published);
+  const visibleLessons = isTeacher ? lessons : lessons.filter((l) => l.published);
+  const visibleQuizzes = isTeacher ? quizzes : quizzes.filter((q) => q.published);
 
   return (
-    <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
-        <div className="mx-auto flex items-center justify-between">
+  <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
+    <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
+      <div className="mx-auto flex items-center justify-between">
+        <Link
+          href="/pages/home"
+          className="flex items-center gap-2 transition-transform hover:scale-95"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
+            <BookOpen size={20} />
+          </div>
+          <span className="hidden text-lg font-bold tracking-tight sm:block">
+            CourseCanvas
+          </span>
+        </Link>
+        <div className="flex items-center gap-4">
+          <div className="border-r border-zinc-200 pr-4 text-right">
+            <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Signed in as
+            </p>
+            <p className="text-sm font-semibold text-zinc-800">
+              {user?.name ?? "User"}
+            </p>
+          </div>
           <Link
-            href="/pages/home"
-            className="flex items-center gap-2 transition-transform hover:scale-95"
+            href="/pages/settings"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white">
-              <BookOpen size={20} />
-            </div>
-            <span className="hidden text-lg font-bold tracking-tight sm:block">
-              CourseCanvas
-            </span>
+            <Settings size={20} className="transition-transform hover:rotate-45" />
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="border-r border-zinc-200 pr-4 text-right">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-                Signed in as
-              </p>
-              <p className="text-sm font-semibold text-zinc-800">
-                {user?.name ?? "User"}
+        </div>
+      </div>
+    </header>
+
+    <main className="mx-auto space-y-8 px-6 py-12">
+      <section className="rounded-3xl bg-zinc-900 p-10 text-white shadow-2xl">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
+          <GraduationCap size={14} /> Active Course
+        </div>
+        <h1 className="text-2xl font-black sm:text-3xl md:text-4xl lg:text-5xl">
+          {course.name}
+        </h1>
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-xl bg-white/10 p-2">
+              <UserCircle size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase opacity-50">Instructor</p>
+              <p className="text-sm font-semibold">{course.instructor}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-xl bg-white/10 p-2">
+              <CalendarDays size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase opacity-50">Schedule</p>
+              <p className="text-sm font-semibold">
+                {course.startDate} - {course.endDate}
               </p>
             </div>
-            <Link
-              href="/pages/settings"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
-            >
-              <Settings
-                size={20}
-                className="transition-transform hover:rotate-45"
-              />
-            </Link>
           </div>
         </div>
-      </header>
+      </section>
 
-      <main className="mx-auto space-y-8 px-6 py-12">
-        {/* Course Hero */}
-        <section className="rounded-3xl bg-zinc-900 p-10 text-white shadow-2xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest">
-            <GraduationCap size={14} /> Active Course
-          </div>
-          <h1 className="text-2xl font-black sm:text-3xl md:text-4xl lg:text-5xl">
-            {course.name}
-          </h1>
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-xl bg-white/10 p-2">
-                <UserCircle size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase opacity-50">
-                  Instructor
-                </p>
-                <p className="text-sm font-semibold">{course.instructor}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-xl bg-white/10 p-2">
-                <CalendarDays size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase opacity-50">
-                  Schedule
-                </p>
-                <p className="text-sm font-semibold">
-                  {course.startDate} - {course.endDate}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+      {actionError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
-        {/* Error banner */}
-        {actionError && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {actionError}
-          </div>
-        )}
-
-        {/* Enrollment / About */}
-        <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-lg font-bold">
-              <Users size={20} className="text-zinc-400" />
-              {isTeacher ? "Class Enrollment" : "About This Course"}
-            </h3>
-            {isTeacher && (
-              <span className="rounded bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-500">
-                {students.length} Total
-              </span>
-            )}
-          </div>
-          {isTeacher ? (
-            students.length === 0 ? (
-              <p className="py-8 text-center text-zinc-400">
-                No students enrolled yet.
-              </p>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {students.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
-                      {s.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </div>
-                    {s.fullName}
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (
-            <p className="text-sm leading-relaxed text-zinc-600">
-              {course.description || "No description provided."}
-            </p>
+      <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-lg font-bold">
+            <Users size={20} className="text-zinc-400" />
+            {isTeacher ? "Class Enrollment" : "About This Course"}
+          </h3>
+          {isTeacher && (
+            <span className="rounded bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-500">
+              {students.length} Total
+            </span>
           )}
         </div>
-
-        {/* Lessons */}
-        <div className="w-full space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="flex items-center gap-2 text-2xl font-bold">
-              <FileText size={24} /> Lessons
-            </h2>
-            {isTeacher && (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={handleLessonUpload}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black disabled:opacity-50"
-                >
-                  {uploading ? (
-                    "Uploading…"
-                  ) : (
-                    <>
-                      <Upload size={16} /> Upload Lesson
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-
-          {visibleLessons.length === 0 ? (
-            <p className="py-12 text-center text-zinc-400">
-              No lessons available.
-            </p>
+        {isTeacher ? (
+          students.length === 0 ? (
+            <p className="py-8 text-center text-zinc-400">No students enrolled yet.</p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {visibleLessons.map((lesson) => (
-                <div key={lesson.id} className="group block">
-                  <div className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
-                    <div className="flex items-start justify-between gap-4">
-                      <a
-                        href={lesson.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-w-0 flex-1 items-center gap-4"
-                      >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-800">
-                          <FileText size={20} />
-                        </div>
-                        <div className="min-w-0 max-w-[150px] sm:max-w-full">
-                          <div className="flex items-center gap-2">
-                            <h3 className="truncate text-lg font-bold group-hover:text-black">
-                              {lesson.title}
-                            </h3>
-
-                          </div>
-                          <p className="truncate text-xs text-zinc-500">
-                            {lesson.fileName}
-                          </p>
-                        </div>
-                      </a>
-
-                      <div className="flex items-center gap-2">
-                        {isTeacher && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLessonPublish(lesson)}
-                              className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
-                                lesson.published
-                                  ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                              }`}
-                              title={
-                                lesson.published
-                                  ? "Unpublish lesson"
-                                  : "Publish lesson"
-                              }
-                            >
-                              {lesson.published ? "Unpublish" : "Publish"}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteLesson(lesson)}
-                              disabled={deletingLessonId === lesson.id}
-                              className="rounded-lg p-2 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                              title="Delete lesson"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </>
-                        )}
-
-                        <a
-                          href={lesson.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-zinc-300 transition-colors hover:text-zinc-800"
-                          title="Open in new tab"
-                        >
-                          {lesson.published && (
-                          <ChevronRight size={20} />
-                        )}
-                        </a>
-                      </div>
-                    </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {students.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                    {s.fullName.split(" ").map((n) => n[0]).join("")}
                   </div>
+                  {s.fullName}
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          )
+        ) : (
+          <p className="text-sm leading-relaxed text-zinc-600">
+            {course.description || "No description provided."}
+          </p>
+        )}
+      </div>
 
-        {/* Quizzes */}
-        <div className="w-full space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="flex items-center gap-2 text-2xl font-bold">
-              <FileQuestion size={24} /> Quizzes
-            </h2>
-            {isTeacher && (
-              <Link
-                href={`/pages/quizCreation?courseId=${uuid}`}
-                className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black"
+      {/* Lessons */}
+      <div className="w-full space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h2 className="flex items-center gap-2 text-2xl font-bold">
+            <FileText size={24} /> Lessons
+          </h2>
+          {isTeacher && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleLessonUpload}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black disabled:opacity-50"
               >
-                <Plus size={16} /> Create Quiz
-              </Link>
-            )}
-          </div>
-
-          {visibleQuizzes.length === 0 ? (
-            <p className="py-12 text-center text-zinc-400">
-              No quizzes available.
-            </p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {visibleQuizzes.map((quiz) => {
-                const card = (
-                  <div className="flex items-center justify-between rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
-                          quiz.published
-                            ? "bg-zinc-100 text-zinc-800"
-                            : "bg-zinc-50 text-zinc-300"
-                        }`}
-                      >
-                        {quiz.published ? (
-                          <FileQuestion size={20} />
-                        ) : (
-                          <Lock size={20} />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-lg font-bold group-hover:text-black">
-                            {quiz.title}
-                          </h3>
-                        </div>
-                        {quiz.dueDate && (
-                          <p className="truncate text-xs text-zinc-500">
-                            Due {quiz.dueDate}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isTeacher && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleToggleQuizPublish(quiz);
-                            }}
-                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${quiz.published ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
-                          >
-                            {quiz.published ? "unlocked" : "locked"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteQuiz(quiz)}
-                            disabled={deletingQuizId === quiz.id}
-                            className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteLesson === quiz.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
-                            title={
-                              pendingDeleteQuiz === quiz.id
-                                ? "Click again to confirm"
-                                : "Delete lesson"
-                            }
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </>
-                      )}
-
-                      {grades.find((g) => g.quizId === quiz.id) && (
-                        <p className="text-xs text-zinc-500">
-                          {grades.find((g) => g.quizId === quiz.id)?.score}%
-                        </p>
-                      )}
-
-                      {quiz.published && (
-                        <ChevronRight
-                          size={20}
-                          className="text-zinc-300 transition-colors hover:text-zinc-800"
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-
-                return quiz.published ? (
-                  isTeacher ? (
-                    <div key={quiz.id} className="block">
-                      {card}
-                    </div>
-                  ) : (
-                    <Link
-                      key={quiz.id}
-                      href={`/pages/quiz/${quiz.id}`}
-                      className="group block"
-                    >
-                      {card}
-                    </Link>
-                  )
-                ) : (
-                  <div key={quiz.id} className="block">
-                    {card}
-                  </div>
-                );
-              })}
-            </div>
+                {uploading ? "Uploading…" : <><Upload size={16} /> Upload Lesson</>}
+              </button>
+            </>
           )}
         </div>
-      </main>
-    </div>
-  );
+
+        {visibleLessons.length === 0 ? (
+          <p className="py-12 text-center text-zinc-400">No lessons available.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {visibleLessons.map((lesson) => (
+              <div
+                key={lesson.id}
+                className="group rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all hover:border-zinc-400 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <a
+                    href={lesson.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 flex-1 items-center gap-4"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-800">
+                      <FileText size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-bold group-hover:text-black">
+                        {lesson.title}
+                      </h3>
+                      <p className="truncate text-xs text-zinc-500">{lesson.fileName}</p>
+                    </div>
+                  </a>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {isTeacher && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleLessonPublish(lesson)}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${lesson.published ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                        >
+                          {lesson.published ? "unlocked" : "locked"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLesson(lesson)}
+                          disabled={deletingLessonId === lesson.id}
+                          className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteLesson === lesson.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
+                          title={pendingDeleteLesson === lesson.id ? "Click again to confirm" : "Delete lesson"}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    )}
+                    
+                    <a
+                      href={lesson.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-zinc-300 transition-colors hover:text-zinc-800"
+                    >
+                      {lesson.published && <ChevronRight size={20} />}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quizzes */}
+      <div className="w-full space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h2 className="flex items-center gap-2 text-2xl font-bold">
+            <FileQuestion size={24} /> Quizzes
+          </h2>
+          {isTeacher && (
+            <Link
+              href={`/pages/quizCreation?courseId=${uuid}`}
+              className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black"
+            >
+              <Plus size={16} /> Create Quiz
+            </Link>
+          )}
+        </div>
+
+        {visibleQuizzes.length === 0 ? (
+          <p className="py-12 text-center text-zinc-400">No quizzes available.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {visibleQuizzes.map((quiz) => {
+              const grade = grades.find((g) => g.quizId === quiz.id);
+
+              const card = (
+                <div className="flex items-center justify-between rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${quiz.published ? "bg-zinc-100 text-zinc-800" : "bg-zinc-50 text-zinc-300"}`}>
+                      {quiz.published ? <FileQuestion size={20} /> : <Lock size={20} />}
+                    </div>
+                    <div>
+                      <h3 className="truncate text-lg font-bold group-hover:text-black">
+                        {quiz.title}
+                      </h3>
+                      {quiz.dueDate && (
+                        <p className="truncate text-xs text-zinc-500">Due {quiz.dueDate}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isTeacher && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleToggleQuizPublish(quiz); }}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${quiz.published ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                        >
+                          {quiz.published ? "unlocked" : "locked"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleDeleteQuiz(quiz); }}
+                          disabled={deletingQuizId === quiz.id}
+                          className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteQuiz === quiz.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
+                          title={pendingDeleteQuiz === quiz.id ? "Click again to confirm" : "Delete quiz"}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    )}
+
+                    {grade && (
+                      <p className="text-xs font-semibold text-zinc-500">
+                        {grade.score}%
+                      </p>
+                    )}
+
+                    {quiz.published && (
+                      <ChevronRight size={20} className="text-zinc-300 transition-colors hover:text-zinc-800" />
+                    )}
+                  </div>
+                </div>
+              );
+
+              // unless you want them to preview it. Adjusted logic for safety.
+              return quiz.published || isTeacher ? (
+                <Link key={quiz.id} href={`/pages/quiz/${quiz.id}`} className="group block">
+                  {card}
+                </Link>
+              ) : (
+                <div key={quiz.id} className="block opacity-60 cursor-not-allowed">{card}</div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </main>
+  </div>
+);
 }
 
 export default function CoursePage() {
