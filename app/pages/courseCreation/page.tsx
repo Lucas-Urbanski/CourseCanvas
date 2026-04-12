@@ -10,6 +10,7 @@ import {
   Calendar,
   FileText,
   Type,
+  Tag,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../context/AuthContext";
@@ -30,6 +31,7 @@ function CourseCreationContent() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [creating, setCreating] = useState(false);
@@ -52,6 +54,7 @@ function CourseCreationContent() {
         .insert({
           title,
           description,
+          category,
           instructorId: user.id,
           startDate: startDate || null,
           endDate: endDate || null,
@@ -63,8 +66,9 @@ function CourseCreationContent() {
         throw error;
       }
 
-      setDescription("");
       setTitle("");
+      setDescription("");
+      setCategory("");
       setStartDate("");
       setEndDate("");
 
@@ -138,6 +142,19 @@ function CourseCreationContent() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Advanced System Architecture"
                 className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white focus:ring-4 focus:ring-zinc-800/5"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
+                <Tag size={14} /> Category
+              </label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g. Computer Science, Engineering, etc..."
+                className="w-full resize-none rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 text-zinc-800 outline-none transition-all focus:border-zinc-800 focus:bg-white focus:ring-4 focus:ring-zinc-800/5"
               />
             </div>
 

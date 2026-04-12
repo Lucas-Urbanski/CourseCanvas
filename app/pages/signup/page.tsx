@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { BookOpen, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [fullName, setFullName] = useState("");
@@ -55,8 +53,7 @@ export default function SignUpPage() {
     }
 
     if (data.session) {
-      router.replace("/pages/home");
-      router.refresh();
+      window.location.href = "/pages/home";
       return;
     }
 
