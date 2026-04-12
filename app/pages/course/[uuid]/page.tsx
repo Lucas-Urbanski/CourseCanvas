@@ -88,7 +88,7 @@ function CourseContent() {
             supabase
               .from("courses")
               .select(
-                `id, title, description, "startDate", "endDate", profiles:instructorId ("fullName")`
+                `id, title, description, "startDate", "endDate", profiles:instructorId ("fullName")`,
               )
               .eq("id", uuid)
               .single(),
@@ -106,7 +106,7 @@ function CourseContent() {
             supabase
               .from("lessons")
               .select(
-                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`
+                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
               )
               .eq("courseId", uuid)
               .order("uploadedAt", { ascending: false }),
@@ -125,11 +125,12 @@ function CourseContent() {
                 id: rawCourse.id,
                 name: rawCourse.title,
                 description: rawCourse.description ?? "",
-                instructor: rawCourse.profiles?.fullName ?? "Unknown Instructor",
+                instructor:
+                  rawCourse.profiles?.fullName ?? "Unknown Instructor",
                 startDate: rawCourse.startDate ?? "",
                 endDate: rawCourse.endDate ?? "",
               }
-            : null
+            : null,
         );
 
         setQuizzes(
@@ -139,13 +140,13 @@ function CourseContent() {
             dueDate: quiz.dueDate ?? "",
             status: quiz.status === "open" ? "Open" : "Locked",
             published: quiz.published ?? false,
-          }))
+          })),
         );
 
         setStudents(
           (enrollmentRes.data ?? [])
             .map((e: any) => e.student as Student | null)
-            .filter((s): s is Student => s !== null)
+            .filter((s): s is Student => s !== null),
         );
 
         setLessons(
@@ -156,7 +157,7 @@ function CourseContent() {
             fileUrl: lesson.fileUrl,
             filePath: lesson.filePath,
             published: lesson.published ?? false,
-          }))
+          })),
         );
       } catch (err) {
         console.error("Fetch failed:", err);
@@ -171,9 +172,7 @@ function CourseContent() {
   // Handlers
   const handleUploadClick = () => fileInputRef.current?.click();
 
-  const handleLessonUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleLessonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !course || !uuid) return;
 
@@ -284,8 +283,8 @@ function CourseContent() {
 
       setLessons((prev) =>
         prev.map((l) =>
-          l.id === lesson.id ? { ...l, published: !l.published } : l
-        )
+          l.id === lesson.id ? { ...l, published: !l.published } : l,
+        ),
       );
     } catch (error: any) {
       console.error("Lesson publish toggle failed:", error);
@@ -307,8 +306,8 @@ function CourseContent() {
 
       setQuizzes((prev) =>
         prev.map((q) =>
-          q.id === quiz.id ? { ...q, published: nextPublished } : q
-        )
+          q.id === quiz.id ? { ...q, published: nextPublished } : q,
+        ),
       );
     } catch (error: any) {
       console.error("Quiz publish toggle failed:", error);
@@ -486,7 +485,13 @@ function CourseContent() {
                   disabled={uploading}
                   className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-bold text-[#F5F1E6] transition-all hover:bg-black disabled:opacity-50"
                 >
-                  {uploading ? "Uploading…" : <><Upload size={16} /> Upload Lesson</>}
+                  {uploading ? (
+                    "Uploading…"
+                  ) : (
+                    <>
+                      <Upload size={16} /> Upload Lesson
+                    </>
+                  )}
                 </button>
               </>
             )}
@@ -545,7 +550,11 @@ function CourseContent() {
                                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                               }`}
-                              title={lesson.published ? "Unpublish lesson" : "Publish lesson"}
+                              title={
+                                lesson.published
+                                  ? "Unpublish lesson"
+                                  : "Publish lesson"
+                              }
                             >
                               {lesson.published ? "Unpublish" : "Publish"}
                             </button>
@@ -597,7 +606,9 @@ function CourseContent() {
           </div>
 
           {visibleQuizzes.length === 0 ? (
-            <p className="py-12 text-center text-zinc-400">No quizzes available.</p>
+            <p className="py-12 text-center text-zinc-400">
+              No quizzes available.
+            </p>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {visibleQuizzes.map((quiz) => {
@@ -613,7 +624,11 @@ function CourseContent() {
                             : "bg-zinc-50 text-zinc-300"
                         }`}
                       >
-                        {isOpen ? <FileQuestion size={20} /> : <Lock size={20} />}
+                        {isOpen ? (
+                          <FileQuestion size={20} />
+                        ) : (
+                          <Lock size={20} />
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -680,21 +695,19 @@ function CourseContent() {
 
                 return quiz.published ? (
                   <div>
-                  {isTeacher ? (
-                  <div key={quiz.id} className="block">
-                    {card}
-                  </div>)
-                  : (<Link
-                    key={quiz.id}
-                    href={`/pages/quiz/${quiz.id}`}
-                return isOpen ? (
-                  <Link
-                    key={quiz.id}
-                    href={`/pages/quiz/${quiz.id}`}
-                    className="group block"
-                  >
-                    {card}
-                  </Link>)}
+                    {isTeacher ? (
+                      <div key={quiz.id} className="block">
+                        {card}
+                      </div>
+                    ) : (
+                      <Link
+                        key={quiz.id}
+                        href={`/pages/quiz/${quiz.id}`}
+                        className="group block"
+                      >
+                        {card}
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   <div key={quiz.id} className="block">
