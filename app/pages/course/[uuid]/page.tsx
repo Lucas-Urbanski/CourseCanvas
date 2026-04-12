@@ -98,103 +98,117 @@ function CourseContent() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem("courseid", course?.id ?? "null");
-  }, [course?.id]);
-
-  useEffect(() => {
     if (!uuid) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [courseRes, quizRes, enrollmentRes, lessonsRes, gradeRes] =
-          await Promise.all([
-            supabase
-              .from("courses")
-              .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
-              )
-              .eq("id", uuid)
-              .single(),
-            supabase
-              .from("quizzes")
-              .select(`id, title, timeLimit, "dueDate", published`)
-              .eq("courseId", uuid),
-            supabase
-              .from("enrollments")
-              .select(`student:studentId (id, "fullName")`)
-              .eq("courseId", uuid),
-            supabase
-              .from("lessons")
-              .select(
-                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
-              )
-              .eq("courseId", uuid)
-              .order('"uploadedAt"', { ascending: false }),
-            supabase
-              .from("grades")
-              .select(`score, "studentId", "quizId", "courseId"`)
-              .eq("courseId", uuid)
-              .eq("studentId", user?.id),
-          ]);
+        const { data: courseData, error: courseError } = await supabase
+          .from("courses")
+          .select(`id, title, description, "startDate", "endDate", "instructorId"`)
+          .eq("id", uuid)
+          .single();
 
-        if (courseRes.error) throw courseRes.error;
-        if (quizRes.error) throw quizRes.error;
-        if (enrollmentRes.error) throw enrollmentRes.error;
-        if (lessonsRes.error) throw lessonsRes.error;
-        if (gradeRes.error) throw gradeRes.error;
+        if (courseError) {
+          console.error("COURSE ERROR:", courseError);
+          throw courseError;
+        }
 
-        const rawCourse = courseRes.data as any;
+        let instructorName = "Unknown Instructor";
+
+        if (courseData?.instructorId) {
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select(`"fullName"`)
+            .eq("id", courseData.instructorId)
+            .single();
+
+          if (profileError) {
+            console.error("PROFILE ERROR:", profileError);
+          } else {
+            instructorName = profileData?.fullName ?? "Unknown Instructor";
+          }
+        }
+
+        const { data: quizData, error: quizError } = await supabase
+          .from("quizzes")
+          .select(`id, title, "dueDate", published`)
+          .eq("courseId", uuid);
+
+        if (quizError) {
+          console.error("QUIZ ERROR:", quizError);
+          throw quizError;
+        }
+
+        const { data: enrollmentData, error: enrollmentError } = await supabase
+          .from("enrollments")
+          .select(`student:studentId (id, "fullName")`)
+          .eq("courseId", uuid);
+
+        if (enrollmentError) {
+          console.error("ENROLLMENT ERROR:", enrollmentError);
+          throw enrollmentError;
+        }
+
+        const { data: lessonData, error: lessonError } = await supabase
+          .from("lessons")
+          .select(`id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`)
+          .eq("courseId", uuid)
+          .order("uploadedAt", { ascending: false });
+
+        if (lessonError) {
+          console.error("LESSON ERROR:", lessonError);
+          throw lessonError;
+        }
 
         setCourse(
-          rawCourse
+          courseData
             ? {
-                id: rawCourse.id,
-                name: rawCourse.title,
-                description: rawCourse.description ?? "",
-                instructorId: rawCourse.instructorId ?? "",
-                instructor:
-                  rawCourse.profiles?.fullName ?? "Unknown Instructor",
-                startDate: rawCourse.startDate ?? "",
-                endDate: rawCourse.endDate ?? "",
+                id: courseData.id,
+                name: courseData.title,
+                description: courseData.description ?? "",
+                instructorId: courseData.instructorId ?? "",
+                instructor: instructorName,
+                startDate: courseData.startDate ?? "",
+                endDate: courseData.endDate ?? "",
               }
             : null,
         );
 
         setQuizzes(
-          (quizRes.data ?? []).map((quiz: any) => ({
-            id: quiz.id,
+          (quizData ?? []).map((quiz: any, index: number) => ({
+            id: String(quiz.id ?? `quiz-${index}`),
             title: quiz.title,
             dueDate: quiz.dueDate ?? "",
-            timeLimit: quiz.timeLimit ?? 0,
+            timeLimit: 0,
             published: quiz.published ?? false,
-          })),
+            status: "Open",
+          }))
         );
 
         setStudents(
-          (enrollmentRes.data ?? [])
-            .map((e: any) => e.student as Student | null)
-            .filter((s): s is Student => s !== null),
+          (enrollmentData ?? [])
+            .map((e: any, index: number) => {
+              const student = e.student as Student | null;
+              if (!student) return null;
+
+              return {
+                ...student,
+                id: String(student.id ?? `student-${index}`),
+              };
+            })
+            .filter((s): s is Student => s !== null)
         );
 
         setLessons(
-          (lessonsRes.data ?? []).map((l: any) => ({
-            id: l.id,
-            title: l.title,
-            fileName: l.fileName,
-            fileUrl: l.fileUrl,
-            filePath: l.filePath,
-            published: l.published ?? false,
-          })),
-        );
-
-        setGrades(
-          (gradeRes.data ?? []).map((g: any) => ({
-            studentId: g.studentId,
-            quizId: g.quizId,
-            courseId: g.courseId,
-            score: g.score,
-          })),
+          (lessonData ?? []).map((lesson: any, index: number) => ({
+            id: String(lesson.id ?? `lesson-${index}`),
+            title: lesson.title,
+            fileName: lesson.fileName,
+            fileUrl: lesson.fileUrl,
+            filePath: lesson.filePath,
+            published: lesson.published ?? false,
+          }))
         );
       } catch (err) {
         console.error("Fetch failed:", err);
@@ -575,17 +589,7 @@ function CourseContent() {
                             <h3 className="truncate text-lg font-bold group-hover:text-black">
                               {lesson.title}
                             </h3>
-                            {isTeacher && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                  lesson.published
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-zinc-100 text-zinc-500"
-                                }`}
-                              >
-                                {lesson.published ? "Published" : "Hidden"}
-                              </span>
-                            )}
+
                           </div>
                           <p className="truncate text-xs text-zinc-500">
                             {lesson.fileName}
@@ -599,7 +603,7 @@ function CourseContent() {
                             <button
                               type="button"
                               onClick={() => handleToggleLessonPublish(lesson)}
-                              className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                              className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
                                 lesson.published
                                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
@@ -632,7 +636,9 @@ function CourseContent() {
                           className="text-zinc-300 transition-colors hover:text-zinc-800"
                           title="Open in new tab"
                         >
+                          {lesson.published && (
                           <ChevronRight size={20} />
+                        )}
                         </a>
                       </div>
                     </div>
@@ -741,21 +747,19 @@ function CourseContent() {
                 );
 
                 return quiz.published ? (
-                  <div>
-                    {isTeacher ? (
-                      <div key={quiz.id} className="block">
-                        {card}
-                      </div>
-                    ) : (
-                      <Link
-                        key={quiz.id}
-                        href={`/pages/quiz/${quiz.id}`}
-                        className="group block"
-                      >
-                        {card}
-                      </Link>
-                    )}
-                  </div>
+                  isTeacher ? (
+                    <div key={quiz.id} className="block">
+                      {card}
+                    </div>
+                  ) : (
+                    <Link
+                      key={quiz.id}
+                      href={`/pages/quiz/${quiz.id}`}
+                      className="group block"
+                    >
+                      {card}
+                    </Link>
+                  )
                 ) : (
                   <div key={quiz.id} className="block">
                     {card}
