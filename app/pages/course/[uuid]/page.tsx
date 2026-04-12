@@ -700,14 +700,27 @@ function CourseContent() {
                   </div>
                 );
 
+<<<<<<< Updated upstream
                 return q.published ? (
                   <Link
                     key={q.id}
                     href={`/pages/quiz/${q.id}`}
+=======
+                return quiz.published ? (
+                  <div>
+                  {isTeacher ? (
+                  <div key={quiz.id} className="block">
+                    {card}
+                  </div>)
+                  : (<Link
+                    key={quiz.id}
+                    href={`/pages/quiz/${quiz.id}`}
+>>>>>>> Stashed changes
                     className="group block"
                   >
                     {card}
-                  </Link>
+                  </Link>)}
+                  </div>
                 ) : (
                   <div key={q.id} className="block">
                     {card}
