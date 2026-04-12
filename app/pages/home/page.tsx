@@ -34,9 +34,8 @@ function HomeContent() {
   const isTeacher = user?.role === "instructor";
 
   const [courses, setCourses] = useState<Course[]>([]);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+  const [completedCourses, setCompletedCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [coursesError, setCoursesError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -50,7 +49,6 @@ function HomeContent() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Only consider courses whose end date has already passed
       const pastCourseIds = enrolledIds.filter((id) => {
         const raw = rawCourses.find((c) => c.id === id);
         if (!raw?.endDate) return false;
@@ -74,20 +72,14 @@ function HomeContent() {
           .in("courseId", pastCourseIds),
       ]);
 
-      const gradedQuizIds = new Set(
-        (gradeData ?? []).map((g: any) => g.quizId),
-      );
+      const gradedQuizIds = new Set((gradeData ?? []).map((g: any) => g.quizId));
 
       return new Set(
         pastCourseIds.filter((courseId) => {
           const quizIds = (quizData ?? [])
             .filter((q: any) => q.courseId === courseId)
             .map((q: any) => q.id);
-          // A course with no published quizzes is not completable
-          return (
-            quizIds.length > 0 &&
-            quizIds.every((id: string) => gradedQuizIds.has(id))
-          );
+          return quizIds.length > 0 && quizIds.every((id: string) => gradedQuizIds.has(id));
         }),
       );
     },
@@ -117,23 +109,35 @@ function HomeContent() {
 
         if (enrollError) throw enrollError;
 
-        const enrolledIds = (enrollments ?? []).map((e: any) => e.courseId);
+        let enrolledIds = (enrollments ?? []).map((e: any) => e.courseId);
         const completedIds = await computeCompletedIds(data ?? [], enrolledIds);
 
+        if (completedIds.size > 0) {
+          const completedArr = [...completedIds];
+          await supabase
+            .from("enrollments")
+            .delete()
+            .eq("studentId", user.id)
+            .in("courseId", completedArr);
+
+          enrolledIds = enrolledIds.filter((id) => !completedIds.has(id));
+        }
+
+        const mapped: Course[] = (data ?? []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          description: c.description ?? "",
+          category: c.category ?? "",
+          instructor: c.profiles?.fullName ?? "Unknown",
+          instructorId: c.instructorId ?? "",
+          startDate: c.startDate ?? "",
+          endDate: c.endDate ?? "",
+          isCompleted: completedIds.has(c.id),
+        }));
+
         setEnrolledCourseIds(new Set(enrolledIds));
-        setCourses(
-          (data ?? []).map((c: any) => ({
-            id: c.id,
-            title: c.title,
-            description: c.description ?? "",
-            category: c.category ?? "",
-            instructor: c.profiles?.fullName ?? "Unknown",
-            instructorId: c.instructorId ?? "",
-            startDate: c.startDate ?? "",
-            endDate: c.endDate ?? "",
-            isCompleted: completedIds.has(c.id),
-          })),
-        );
+        setCourses(mapped);
+        setCompletedCourses(mapped.filter((c) => c.isCompleted));
       } else {
         setCourses(
           (data ?? []).map((c: any) => ({
@@ -177,7 +181,6 @@ function HomeContent() {
         throw error;
       }
 
-      // Optimistically add to enrolled set, then recompute completion
       const newEnrolledIds = [...enrolledCourseIds, courseId];
       const completedIds = await computeCompletedIds(courses, newEnrolledIds);
 
@@ -205,9 +208,7 @@ function HomeContent() {
 
       if (error) throw error;
 
-      const newEnrolledIds = [...enrolledCourseIds].filter(
-        (id) => id !== courseId,
-      );
+      const newEnrolledIds = [...enrolledCourseIds].filter((id) => id !== courseId);
       const completedIds = await computeCompletedIds(courses, newEnrolledIds);
 
       setEnrolledCourseIds(new Set(newEnrolledIds));
@@ -257,11 +258,19 @@ function HomeContent() {
   const otherCourses = isTeacher
     ? filteredCourses.filter((c) => c.instructorId !== user?.id)
     : [];
+
+  const filteredCompleted = !isTeacher
+    ? completedCourses.filter(
+        (c) =>
+          c.title.toLowerCase().includes(search.toLowerCase()) ||
+          c.category.toLowerCase().includes(search.toLowerCase()),
+      )
+    : [];
   const enrolledCourses = !isTeacher
-    ? filteredCourses.filter((c) => enrolledCourseIds.has(c.id))
+    ? filteredCourses.filter((c) => enrolledCourseIds.has(c.id) && !c.isCompleted)
     : [];
   const browseCourses = !isTeacher
-    ? filteredCourses.filter((c) => !enrolledCourseIds.has(c.id))
+    ? filteredCourses.filter((c) => !enrolledCourseIds.has(c.id) && !c.isCompleted)
     : [];
 
   return (
@@ -307,10 +316,7 @@ function HomeContent() {
               href="/pages/settings"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
             >
-              <Settings
-                size={20}
-                className="transition-transform hover:rotate-45"
-              />
+              <Settings size={20} className="transition-transform hover:rotate-45" />
             </Link>
           </div>
         </div>
@@ -353,13 +359,12 @@ function HomeContent() {
               </div>
             )}
 
+            {/* TEACHER VIEW */}
             {isTeacher && (
               <>
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">
-                      My Courses
-                    </h2>
+                    <h2 className="text-xl font-bold text-zinc-900">My Courses</h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {myCourses.length}
                     </span>
@@ -367,9 +372,7 @@ function HomeContent() {
                   <div className="rounded-3xl border border-zinc-300 bg-white/50 p-8 shadow-sm">
                     {myCourses.length === 0 ? (
                       <p className="py-10 text-center text-zinc-400">
-                        {search
-                          ? "No matching courses."
-                          : "You haven't created any courses yet."}
+                        {search ? "No matching courses." : "You haven't created any courses yet."}
                       </p>
                     ) : (
                       <CourseCard courses={myCourses} onDelete={handleDelete} />
@@ -380,9 +383,7 @@ function HomeContent() {
                 {(otherCourses.length > 0 || !search) && (
                   <section className="space-y-4">
                     <div className="flex items-center justify-between px-1">
-                      <h2 className="text-xl font-bold text-zinc-900">
-                        Other Courses
-                      </h2>
+                      <h2 className="text-xl font-bold text-zinc-900">Other Courses</h2>
                       <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                         {otherCourses.length}
                       </span>
@@ -401,13 +402,30 @@ function HomeContent() {
               </>
             )}
 
+            {/* ── STUDENT VIEW ─────────────────────────────── */}
             {!isTeacher && (
               <>
+                {/* Completed Courses — amber section, no unenroll button */}
+                {filteredCompleted.length > 0 && (
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <h2 className="text-xl font-bold text-zinc-900">
+                        Completed Courses
+                      </h2>
+                      <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-700">
+                        {filteredCompleted.length}
+                      </span>
+                    </div>
+                    <div className="rounded-3xl border border-amber-200 bg-white/50 p-8 shadow-sm">
+                      <CourseCard courses={filteredCompleted} />
+                    </div>
+                  </section>
+                )}
+
+                {/* Enrolled Courses */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">
-                      Enrolled Courses
-                    </h2>
+                    <h2 className="text-xl font-bold text-zinc-900">Enrolled Courses</h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {enrolledCourses.length}
                     </span>
@@ -420,19 +438,15 @@ function HomeContent() {
                           : "You haven't enrolled in any courses yet."}
                       </p>
                     ) : (
-                      <CourseCard
-                        courses={enrolledCourses}
-                        onUnenroll={handleUnenroll}
-                      />
+                      <CourseCard courses={enrolledCourses} onUnenroll={handleUnenroll} />
                     )}
                   </div>
                 </section>
 
+                {/* Browse Courses */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">
-                      Browse Courses
-                    </h2>
+                    <h2 className="text-xl font-bold text-zinc-900">Browse Courses</h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {browseCourses.length}
                     </span>
@@ -445,10 +459,7 @@ function HomeContent() {
                           : "No other courses available right now."}
                       </p>
                     ) : (
-                      <CourseCard
-                        courses={browseCourses}
-                        onEnroll={handleEnroll}
-                      />
+                      <CourseCard courses={browseCourses} onEnroll={handleEnroll} />
                     )}
                   </div>
                 </section>

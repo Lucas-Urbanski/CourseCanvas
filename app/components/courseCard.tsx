@@ -9,7 +9,7 @@ import {
   XIcon,
   Check,
   LogOut,
-  BadgeCheck,
+  Award,
 } from "lucide-react";
 
 type Course = {
@@ -30,6 +30,87 @@ interface CourseCardProps {
   onDelete?: (courseId: string) => Promise<void>;
 }
 
+function CertificateModal({
+  course,
+  onClose,
+}: {
+  course: Course;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Gold header */}
+        <div className="bg-gradient-to-r from-amber-500 to-yellow-400 px-8 py-6 text-center">
+          <Award size={48} className="mx-auto mb-2 text-white drop-shadow" />
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-900/70">
+            Certificate of Completion
+          </p>
+        </div>
+
+        {/* Certificate body */}
+        <div className="px-10 py-8 text-center">
+          <p className="mb-1 text-sm text-zinc-400">This certifies that</p>
+          <p className="mb-4 text-xs font-bold uppercase tracking-widest text-zinc-500">
+            you have successfully completed
+          </p>
+
+          <h2 className="mb-6 text-3xl font-black text-zinc-900">
+            {course.title}
+          </h2>
+
+          <div className="mx-auto mb-6 h-px w-24 bg-amber-400" />
+
+          <div className="mb-8 flex justify-center gap-8 text-sm text-zinc-500">
+            <div className="flex items-center gap-1.5">
+              <User size={14} className="text-zinc-400" />
+              <span>{course.instructor}</span>
+            </div>
+            {course.endDate && (
+              <div className="flex items-center gap-1.5">
+                <Calendar size={14} className="text-zinc-400" />
+                <span>
+                  {new Date(course.endDate).toLocaleDateString(undefined, {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Decorative seal */}
+          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-full border-4 border-amber-400 bg-amber-50">
+            <Award size={36} className="text-amber-500" />
+          </div>
+
+          <div className="flex gap-3">
+            <Link
+              href={`/pages/course/${course.id}`}
+              className="flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-50"
+            >
+              View Course
+            </Link>
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-xl bg-zinc-900 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CourseCard({
   courses,
   onEnroll,
@@ -37,6 +118,7 @@ export default function CourseCard({
   onDelete,
 }: CourseCardProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [certCourse, setCertCourse] = useState<Course | null>(null);
 
   const handleEnrollClick = (e: React.MouseEvent, courseId: string) => {
     e.preventDefault();
@@ -63,28 +145,31 @@ export default function CourseCard({
   };
 
   return (
-    <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-      {courses.map((course) => {
-        const isConfirming = pendingAction === course.id;
+    <>
+      {certCourse && (
+        <CertificateModal
+          course={certCourse}
+          onClose={() => setCertCourse(null)}
+        />
+      )}
 
-        return (
-          <Link
-            key={course.id}
-            href={`/pages/course/${course.id}`}
-            className="group block"
-          >
+      <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        {courses.map((course) => {
+          const isConfirming = pendingAction === course.id;
+
+          const card = (
             <div
               className={`relative flex h-full flex-col justify-between overflow-hidden rounded-3xl border bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${
                 course.isCompleted
-                  ? "border-green-300 ring-1 ring-green-200"
+                  ? "border-amber-300 ring-1 ring-amber-200"
                   : "border-zinc-300"
               }`}
             >
-              {/* Completed ribbon */}
+              {/* Certificate Card */}
               {course.isCompleted && (
-                <div className="absolute right-0 top-0 flex items-center gap-1.5 rounded-bl-2xl rounded-tr-3xl bg-green-600 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
-                  <BadgeCheck size={12} />
-                  Completed
+                <div className="absolute right-0 top-0 flex items-center gap-2 rounded-bl-2xl rounded-tr-3xl bg-gradient-to-r from-amber-500 to-yellow-400 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
+                  <Award size={12} />
+                  Certified
                 </div>
               )}
 
@@ -118,13 +203,9 @@ export default function CourseCard({
                         }`}
                       >
                         {isConfirming ? (
-                          <>
-                            <Check size={14} /> Confirm
-                          </>
+                          <><Check size={14} /> Confirm</>
                         ) : (
-                          <>
-                            <XIcon size={14} /> Remove
-                          </>
+                          <><XIcon size={14} /> Remove</>
                         )}
                       </button>
                     </div>
@@ -154,13 +235,9 @@ export default function CourseCard({
                         }`}
                       >
                         {isConfirming ? (
-                          <>
-                            <Check size={14} /> Confirm
-                          </>
+                          <><Check size={14} /> Confirm</>
                         ) : (
-                          <>
-                            <LogOut size={14} /> Unenroll
-                          </>
+                          <><LogOut size={14} /> Unenroll</>
                         )}
                       </button>
                     </div>
@@ -210,9 +287,27 @@ export default function CourseCard({
                 </div>
               </div>
             </div>
-          </Link>
-        );
-      })}
-    </div>
+          );
+
+          return course.isCompleted ? (
+            <div
+              key={course.id}
+              className="group block cursor-pointer"
+              onClick={() => setCertCourse(course)}
+            >
+              {card}
+            </div>
+          ) : (
+            <Link
+              key={course.id}
+              href={`/pages/course/${course.id}`}
+              className="group block"
+            >
+              {card}
+            </Link>
+          );
+        })}
+      </div>
+    </>
   );
 }
