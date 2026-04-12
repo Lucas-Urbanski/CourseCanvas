@@ -564,17 +564,7 @@ function CourseContent() {
                             <h3 className="truncate text-lg font-bold group-hover:text-black">
                               {lesson.title}
                             </h3>
-                            {isTeacher && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                  lesson.published
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-zinc-100 text-zinc-500"
-                                }`}
-                              >
-                                {lesson.published ? "Published" : "Hidden"}
-                              </span>
-                            )}
+
                           </div>
                           <p className="truncate text-xs text-zinc-500">
                             {lesson.fileName}
@@ -588,7 +578,7 @@ function CourseContent() {
                             <button
                               type="button"
                               onClick={() => handleToggleLessonPublish(lesson)}
-                              className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                              className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
                                 lesson.published
                                   ? "bg-green-100 text-green-700 hover:bg-green-200"
                                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
@@ -621,7 +611,9 @@ function CourseContent() {
                           className="text-zinc-300 transition-colors hover:text-zinc-800"
                           title="Open in new tab"
                         >
+                          {lesson.published && (
                           <ChevronRight size={20} />
+                        )}
                         </a>
                       </div>
                     </div>
