@@ -18,6 +18,7 @@ import AuthGuard from "../../components/AuthGuard";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/navigation";
 
+// Type definitions for quiz structure and multiple-choice options
 type QuestionChoice = "A" | "B" | "C" | "D";
 
 type Question = {
@@ -29,6 +30,7 @@ type Question = {
   D: string;
 };
 
+// Helper function to initialize a new empty question object with a unique ID
 function makeQuestion(id: number): Question {
   return {
     id,
@@ -44,13 +46,17 @@ function QuizCreationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+
+  // courseId is retrieved from the URL query string (e.g., ?courseId=...)
   const courseId = searchParams.get("courseId");
 
+  // State management for quiz metadata and dynamic question list
   const [answers, setAnswers] = useState<Record<number, QuestionChoice>>({});
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [questions, setQuestions] = useState<Question[]>([makeQuestion(1)]);
 
+  // Memoize the Supabase client to prevent redundant initializations
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -60,14 +66,21 @@ function QuizCreationContent() {
     [],
   );
 
+  // Main submission handler to save the quiz to the database
   const handleCreateQuiz = async () => {
+    // Validation checks for required fields
     if (!user) return alert("You must be signed in.");
     if (!title.trim()) return alert("Please enter a quiz title.");
     if (!dueDate) return alert("You must have a due date.");
-    if (!courseId) return alert("Course ID missing. Please reload the course page.");
-    if (Object.keys(answers).length != questions.length) return alert ("One or more of the Questions don't have answer");
+    if (!courseId)
+      return alert("Course ID missing. Please reload the course page.");
+
+    // Ensure every question created has a designated correct answer
+    if (Object.keys(answers).length != questions.length)
+      return alert("One or more of the questions don't have an answer.");
 
     try {
+      // Combines the question text with the selected correct answer into a final array
       const finalQuestions = questions.map((q) => ({
         id: q.id,
         prompt: q.prompt,
@@ -78,6 +91,7 @@ function QuizCreationContent() {
         correctAnswer: answers[q.id] || null,
       }));
 
+      // Insert the quiz record into the Supabase "quizzes" table
       const { error } = await supabase.from("quizzes").insert({
         courseId,
         title,
@@ -87,6 +101,7 @@ function QuizCreationContent() {
 
       if (error) throw error;
 
+      // Navigate back to the course dashboard upon success
       router.push(`/pages/course/${courseId}`);
     } catch (error: any) {
       console.error("Error creating quiz:", error);
@@ -94,6 +109,7 @@ function QuizCreationContent() {
     }
   };
 
+  // Update specific text fields for a specific question ID
   const handleUpdateQuestion = (
     questionId: number,
     field: keyof Omit<Question, "id">,
@@ -104,12 +120,16 @@ function QuizCreationContent() {
     );
   };
 
+  // Sets which letter is the "correct" one for a specific question
   const handleUpdateAnswer = (questionId: number, choice: QuestionChoice) => {
     setAnswers((prev) => ({ ...prev, [questionId]: choice }));
   };
 
+  // Removes a question and its associated correct answer from state
   const handleDeleteQuestion = (questionId: number) => {
-    setQuestions((prev) => prev.filter((question) => question.id !== questionId));
+    setQuestions((prev) =>
+      prev.filter((question) => question.id !== questionId),
+    );
 
     setAnswers((prev) => {
       const updated = { ...prev };
@@ -118,17 +138,21 @@ function QuizCreationContent() {
     });
   };
 
+  // Bulk adjustment for the number of questions via the numeric input
   const handleQuantityChange = (val: number) => {
     let newQuantity = val;
 
+    // Constrain quantity between 1 and 50
     if (newQuantity < 1) newQuantity = 1;
     if (newQuantity > 50) newQuantity = 50;
 
     setQuestions((prev) => {
       if (newQuantity === prev.length) return prev;
 
+      // Add new questions if increasing count
       if (newQuantity > prev.length) {
-        const currentMaxId = prev.length > 0 ? Math.max(...prev.map((q) => q.id)) : 0;
+        const currentMaxId =
+          prev.length > 0 ? Math.max(...prev.map((q) => q.id)) : 0;
         const newQuestions = Array.from(
           { length: newQuantity - prev.length },
           (_, index) => makeQuestion(currentMaxId + index + 1),
@@ -136,6 +160,7 @@ function QuizCreationContent() {
         return [...prev, ...newQuestions];
       }
 
+      // If decreasing, truncate the array and clean up the answers state for removed questions
       const keptQuestions = prev.slice(0, newQuantity);
       const keptIds = new Set(keptQuestions.map((q) => q.id));
 
@@ -156,6 +181,7 @@ function QuizCreationContent() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F1E6] text-zinc-800">
+      {/* Navigation Header */}
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/70 px-8 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link
@@ -179,11 +205,15 @@ function QuizCreationContent() {
             className="flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 font-bold text-zinc-800 transition hover:bg-zinc-50"
           >
             Settings
-            <Settings size={20} className="transition-transform hover:rotate-45" />
+            <Settings
+              size={20}
+              className="transition-transform hover:rotate-45"
+            />
           </Link>
         </div>
       </header>
 
+      {/* Quiz Creation Form */}
       <main className="mx-auto w-full max-w-3xl space-y-8 px-6 py-12">
         <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="grid gap-8 md:grid-cols-2">
@@ -226,6 +256,7 @@ function QuizCreationContent() {
           </div>
         </section>
 
+        {/* Dynamic List of Questions */}
         <div className="space-y-6">
           {questions.map((question, i) => (
             <div
@@ -245,6 +276,7 @@ function QuizCreationContent() {
                 </button>
               </div>
 
+              {/* Prompt Input */}
               <input
                 type="text"
                 placeholder="What is the question prompt?"
@@ -255,6 +287,7 @@ function QuizCreationContent() {
                 }
               />
 
+              {/* Multiple Choice Inputs */}
               <div className="grid gap-3 sm:grid-cols-2">
                 {(["A", "B", "C", "D"] as QuestionChoice[]).map((letter) => (
                   <div key={letter} className="relative">
@@ -264,9 +297,14 @@ function QuizCreationContent() {
                       value={question[letter]}
                       className="w-full rounded-xl border border-zinc-100 bg-zinc-50 py-3 pl-12 pr-4 text-sm outline-none focus:border-zinc-800 focus:bg-white"
                       onChange={(e) =>
-                        handleUpdateQuestion(question.id, letter, e.target.value)
+                        handleUpdateQuestion(
+                          question.id,
+                          letter,
+                          e.target.value,
+                        )
                       }
                     />
+                    {/* Correct Answer Selector */}
                     <button
                       type="button"
                       onClick={() => handleUpdateAnswer(question.id, letter)}
@@ -282,15 +320,18 @@ function QuizCreationContent() {
                 ))}
               </div>
 
+              {/* Display Correct Answer */}
               {answers[question.id] && (
                 <div className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                  <CheckCircle2 size={14} /> Correct Answer Set to {answers[question.id]}
+                  <CheckCircle2 size={14} /> Correct Answer Set to{" "}
+                  {answers[question.id]}
                 </div>
               )}
             </div>
           ))}
         </div>
 
+        {/* Final Publish Button */}
         <div className="flex justify-center">
           <button
             type="button"
@@ -306,6 +347,7 @@ function QuizCreationContent() {
   );
 }
 
+// Global exported component wrapped in AuthGuard to protect access
 export default function QuizCreation() {
   return (
     <AuthGuard>

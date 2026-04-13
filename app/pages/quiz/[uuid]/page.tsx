@@ -7,6 +7,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../../context/AuthContext";
 import AuthGuard from "../../../components/AuthGuard";
 
+// TypeScript definitions for the Quiz structure
 type QuestionChoice = "A" | "B" | "C" | "D";
 
 type QuizQuestion = {
@@ -27,11 +28,13 @@ type Quiz = {
 };
 
 function QuizContent() {
+  // Extract the quiz UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const { user } = useAuth();
   const router = useRouter();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
 
+  // Initialize Supabase client, memoized to prevent recreation on every render
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -41,11 +44,13 @@ function QuizContent() {
     []
   );
 
+  // Component state
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [quizLocked, setQuizLocked] = useState(false);
+  const [answers, setAnswers] = useState<Record<number, string>>({}); // Tracks selected answers by question ID
+  const [quizLocked, setQuizLocked] = useState(false); // Prevents retakes if already submitted
 
+  // Data fetching effect: checks completion status and loads quiz content
   useEffect(() => {
     const fetchData = async () => {
       if (!uuid || !user?.id) return;
@@ -53,7 +58,7 @@ function QuizContent() {
       setLoading(true);
 
       try {
-        // 1. Check if student already has a grade for this quiz
+        // 1. Check if the student already has a recorded grade for this specific quiz
         const { data: existingGrade, error: gradeCheckError } = await supabase
           .from("grades")
           .select(`quizId`)
@@ -65,7 +70,7 @@ function QuizContent() {
           console.error("GRADE CHECK ERROR:", gradeCheckError);
         }
 
-        // 2. Check quiz attempts
+        // 2. Check the quiz_attempts table to see if it was marked as submitted
         const { data: existingAttempt, error: attemptError } = await supabase
           .from("quiz_attempts")
           .select(`id, submitted`)
@@ -77,14 +82,14 @@ function QuizContent() {
           console.error("ATTEMPT CHECK ERROR:", attemptError);
         }
 
-        // 3. If either one exists, lock the quiz
+        // 3. If a grade exists or an attempt was submitted, lock the UI to prevent a retake
         if (existingGrade || existingAttempt?.submitted) {
           setQuizLocked(true);
           setLoading(false);
           return;
         }
 
-        // 4. Load quiz
+        // 4. Load the actual quiz content title and JSON questions
         const { data, error } = await supabase
           .from("quizzes")
           .select(`id, title, "courseId", questions`)
@@ -95,7 +100,7 @@ function QuizContent() {
 
         setQuiz(data as Quiz);
 
-        // 5. Ensure attempt row exists
+        // 5. Initialize a 'quiz_attempt' record if one doesn't exist yet
         if (!existingAttempt) {
           const { error: insertAttemptError } = await supabase
             .from("quiz_attempts")
@@ -125,6 +130,7 @@ function QuizContent() {
     fetchData();
   }, [uuid, user?.id, supabase]);
 
+  // Persistent progress: Load saved answers from localStorage on mount
   useEffect(() => {
     if (!uuid || quizLocked) return;
     const saved = localStorage.getItem(`quiz-answers-${uuid}`);
@@ -137,6 +143,7 @@ function QuizContent() {
     }
   }, [uuid, quizLocked]);
 
+  // Persistent progress: Save answers to localStorage whenever they change
   useEffect(() => {
     if (!uuid || Object.keys(answers).length === 0 || quizLocked) return;
     localStorage.setItem(`quiz-answers-${uuid}`, JSON.stringify(answers));
@@ -144,6 +151,7 @@ function QuizContent() {
 
   let grade = 0;
 
+  // Internal logic to compare user answers against the correctAnswer property
   const calculateGrade = () => {
     let numberOfCorrectAnswers = 0;
 
@@ -153,15 +161,17 @@ function QuizContent() {
       }
     });
 
+    // Calculate percentage and round to 2 decimal places
     grade = (numberOfCorrectAnswers / (quiz?.questions?.length ?? 1)) * 100;
     grade = Math.round(grade * 100) / 100;
   };
 
+  // Submission handler: records grade and marks attempt as finished
   const handleGrading = async () => {
     calculateGrade();
 
     try {
-      // 1. Save grade
+      // 1. Save final score to the 'grades' table
       const { error: gradeError } = await supabase.from("grades").insert({
         studentId: user?.id,
         quizId: quiz?.id,
@@ -171,7 +181,7 @@ function QuizContent() {
 
       if (gradeError) throw gradeError;
 
-      // 2. Mark attempt as submitted
+      // 2. Update 'quiz_attempts' to mark as submitted and store the timestamp/score
       const { error: attemptUpdateError } = await supabase
         .from("quiz_attempts")
         .upsert(
@@ -197,16 +207,19 @@ function QuizContent() {
     }
   };
 
+  // Update local state when a user clicks an answer
   const handleSelect = (qId: number, letter: string) => {
     setAnswers((prev) => ({ ...prev, [qId]: letter }));
   };
 
+  // Scroll logic for the sidebar navigation
   const scrollToQuestion = (id: number) => {
     document
       .getElementById(`question-${id}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Loading view
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F1E6] text-zinc-500">
@@ -215,6 +228,7 @@ function QuizContent() {
     );
   }
 
+  // Locked view witch preventing retakes
   if (quizLocked) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F1E6] px-6 text-zinc-800">
@@ -235,6 +249,7 @@ function QuizContent() {
     );
   }
 
+  // Error view
   if (!quiz) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F1E6] text-zinc-500">
@@ -247,6 +262,7 @@ function QuizContent() {
 
   return (
     <main className="min-h-screen bg-[#F5F1E6] text-zinc-800 flex">
+      {/* Sidebar Navigation */}
       <aside className="sticky top-0 z-20 flex h-screen w-20 flex-col items-center gap-6 border-r border-zinc-200 bg-white/80 py-10 backdrop-blur-md md:w-24">
         {questions.map((q, index) => {
           const isAnswered = !!answers[q.id];
@@ -262,6 +278,7 @@ function QuizContent() {
               }`}
             >
               Q{index + 1}
+              {/* Sidebar Buttons */}
               <div className="absolute -right-1 -top-1">
                 {isAnswered ? (
                   <div className="rounded-full border-2 border-white bg-emerald-500 p-0.5 shadow-sm">
@@ -278,6 +295,7 @@ function QuizContent() {
         })}
       </aside>
 
+      {/* List of Questions */}
       <div className="flex flex-1 flex-col items-center px-6 py-12 md:px-12">
         <div className="w-full max-w-4xl space-y-12">
           {questions.map((q, index) => (
@@ -290,6 +308,7 @@ function QuizContent() {
                   : "border-zinc-200 opacity-90"
               }`}
             >
+              {/* Question Header */}
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-zinc-500">
@@ -311,6 +330,7 @@ function QuizContent() {
                 {q.prompt}
               </h2>
 
+              {/* Answer Choices inputs */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {(["A", "B", "C", "D"] as const).map((letter) => {
                   const isSelected = answers[q.id] === letter;
@@ -348,6 +368,7 @@ function QuizContent() {
             </section>
           ))}
 
+          {/* Submission Area */}
           <div className="flex flex-col items-center gap-4 pb-32 pt-6">
             <p className="text-sm font-bold uppercase tracking-widest text-zinc-400">
               {Object.keys(answers).length} of {questions.length} Answered
@@ -355,11 +376,13 @@ function QuizContent() {
             <button
               type="button"
               onClick={async () => {
+                // Prevent submission unless all questions have an answer
                 if (Object.keys(answers).length !== questions.length) return;
 
                 const success = await handleGrading();
                 if (!success) return;
 
+                // Cleanup local storage and redirect to course page on success
                 localStorage.removeItem(`quiz-answers-${uuid}`);
                 router.push(`/pages/course/${quiz.courseId}`);
               }}
@@ -380,6 +403,7 @@ function QuizContent() {
   );
 }
 
+// Global Export with Authentication wrapper
 export default function Quiz() {
   return (
     <AuthGuard>

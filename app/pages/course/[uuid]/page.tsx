@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import {
   BookOpen,
@@ -22,6 +22,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../../context/AuthContext";
 import AuthGuard from "../../../components/AuthGuard";
 
+// Type Definitions for Type Safety
 type Course = {
   id: string;
   name: string;
@@ -62,9 +63,11 @@ type Grade = {
 };
 
 function CourseContent() {
+  // Extract the course UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
 
+  // Initialize Supabase client using useMemo to prevent reinitialization on every render
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -74,11 +77,20 @@ function CourseContent() {
     [],
   );
 
+  // Auth context for the current logged-in user
   const { user } = useAuth();
+
+  // State management for course data and UI interactions
   const [course, setCourse] = useState<Course | null>(null);
+
+  // Boolean check to determine if the logged-in user is the teacher of this course
   const isTeacher = course?.instructorId === user?.id;
 
+  // Ref for the hidden file input used in lesson uploads
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Refs to auto-clear the pending delete confirmations after a timeout
+  const pendingDeleteQuizTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDeleteLessonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -86,22 +98,33 @@ function CourseContent() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
 
+  // Action states for loading indicators and error handling
   const [uploading, setUploading] = useState(false);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
-  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(
-    null,
-  );
+  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(null);
+  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Clear both pending-delete timers on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (pendingDeleteQuizTimerRef.current) clearTimeout(pendingDeleteQuizTimerRef.current);
+      if (pendingDeleteLessonTimerRef.current) clearTimeout(pendingDeleteLessonTimerRef.current);
+    };
+  }, []);
+
+  // Data Fetching Effect
   useEffect(() => {
     if (!uuid) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch Course, Quizzes, Enrollments, Lessons, and Grades concurrently for performance
         const [courseRes, quizRes, enrollmentRes, lessonsRes, gradeRes] =
           await Promise.all([
+            // Get course info and join with profiles table for instructor name
             supabase
               .from("courses")
               .select(
@@ -109,14 +132,17 @@ function CourseContent() {
               )
               .eq("id", uuid)
               .single(),
+            // Get all quizzes for this course
             supabase
               .from("quizzes")
               .select(`id, title, timeLimit, "dueDate", published`)
               .eq("courseId", uuid),
+            // Get enrolled students
             supabase
               .from("enrollments")
               .select(`student:studentId (id, "fullName")`)
               .eq("courseId", uuid),
+            // Get lessons ordered by most recent
             supabase
               .from("lessons")
               .select(
@@ -124,6 +150,7 @@ function CourseContent() {
               )
               .eq("courseId", uuid)
               .order("uploadedAt", { ascending: false }),
+            // Get grades only for the current user
             supabase
               .from("grades")
               .select(`score, "studentId", "quizId", "courseId"`)
@@ -131,12 +158,14 @@ function CourseContent() {
               .eq("studentId", user?.id),
           ]);
 
+        // Error handling for all requests
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
         if (lessonsRes.error) throw lessonsRes.error;
         if (gradeRes.error) throw gradeRes.error;
 
+        // Map raw database data to our defined types
         const raw = courseRes.data as any;
         setCourse({
           id: raw.id,
@@ -193,12 +222,16 @@ function CourseContent() {
     fetchData();
   }, [uuid, supabase, user?.id]);
 
+  // Handlers for Instructor Actions
+
+  // Uploads a file to Supabase Storage and adds a record to the "lessons" table
   const handleLessonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !uuid) return;
 
     setActionError(null);
 
+    // Verify session
     const {
       data: { user: liveUser },
       error: userError,
@@ -211,19 +244,23 @@ function CourseContent() {
 
     try {
       setUploading(true);
+      // Clean filename and create a unique path
       const safeName = file.name.replace(/\s+/g, "_");
       const filePath = `${uuid}/${Date.now()}_${safeName}`;
 
+      // 1. Upload file to Storage bucket
       const { error: uploadError } = await supabase.storage
         .from("lesson-files")
         .upload(filePath, file, { upsert: false });
       if (uploadError)
         throw new Error(`Storage upload failed: ${uploadError.message}`);
 
+      // 2. Generate public URL for the file
       const {
         data: { publicUrl },
       } = supabase.storage.from("lesson-files").getPublicUrl(filePath);
 
+      // 3. Insert metadata into "lessons" table
       const { data: inserted, error: insertError } = await supabase
         .from("lessons")
         .insert([
@@ -239,14 +276,13 @@ function CourseContent() {
         ])
         .select(`id, title, "fileName", "fileUrl", "filePath", published`)
         .single();
+
       if (insertError)
         throw new Error(`Database insert failed: ${insertError.message}`);
 
+      // Update local state to show the new lesson immediately
       setLessons((prev) => [
-        {
-          ...(inserted as Lesson),
-          id: String((inserted as any).id),
-        },
+        { ...(inserted as Lesson), id: String((inserted as any).id) },
         ...prev,
       ]);
     } catch (err: any) {
@@ -254,56 +290,69 @@ function CourseContent() {
       setActionError(err.message || "Upload failed.");
     } finally {
       setUploading(false);
+      // Reset input so the same file can be re-uploaded if needed
       e.target.value = "";
     }
   };
 
-  const handleDeleteLesson = async (lesson: Lesson) => {
-    if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
-      return;
-    }
+  // Deletes a lesson from both Database and Storage using a double-click confirmation
+  // pattern. The first click arms the button (turns red, 3s auto-reset); the second
+  // click within that window performs the deletion — no browser confirm() dialog needed.
+  const handleDeleteLesson = useCallback(
+    async (lesson: Lesson) => {
+      if (pendingDeleteLesson !== lesson.id) {
+        // First click: arm the confirmation
+        setPendingDeleteLesson(lesson.id);
 
-    setActionError(null);
-
-    try {
-      setDeletingLessonId(lesson.id);
-
-      const { data: dbData, error: dbError } = await supabase
-        .from("lessons")
-        .delete()
-        .eq("id", Number(lesson.id))
-        .select();
-
-      console.log("DB DELETE DATA:", dbData);
-      console.log("DB DELETE ERROR:", dbError);
-
-      if (dbError) {
-        throw new Error(`Database delete failed: ${dbError.message}`);
+        if (pendingDeleteLessonTimerRef.current)
+          clearTimeout(pendingDeleteLessonTimerRef.current);
+        pendingDeleteLessonTimerRef.current = setTimeout(() => {
+          setPendingDeleteLesson(null);
+        }, 3000);
+        return;
       }
 
-      if (!dbData || dbData.length === 0) {
-        throw new Error("Lesson was not deleted from the database.");
+      // Second click within 3s: proceed with deletion
+      if (pendingDeleteLessonTimerRef.current)
+        clearTimeout(pendingDeleteLessonTimerRef.current);
+      setPendingDeleteLesson(null);
+
+      setActionError(null);
+      try {
+        setDeletingLessonId(lesson.id);
+
+        // 1. Delete from DB
+        const { data: dbData, error: dbError } = await supabase
+          .from("lessons")
+          .delete()
+          .eq("id", Number(lesson.id))
+          .select();
+
+        if (dbError)
+          throw new Error(`Database delete failed: ${dbError.message}`);
+        if (!dbData || dbData.length === 0)
+          throw new Error("Lesson was not deleted from the database.");
+
+        // 2. Delete from Storage
+        const { error: storageError } = await supabase.storage
+          .from("lesson-files")
+          .remove([lesson.filePath]);
+        if (storageError)
+          throw new Error(`Storage delete failed: ${storageError.message}`);
+
+        // Update local state
+        setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
+      } catch (err: any) {
+        console.error("Delete failed:", err);
+        setActionError(err.message || "Delete failed.");
+      } finally {
+        setDeletingLessonId(null);
       }
+    },
+    [pendingDeleteLesson, supabase],
+  );
 
-      const { error: storageError } = await supabase.storage
-        .from("lesson-files")
-        .remove([lesson.filePath]);
-
-      console.log("STORAGE DELETE ERROR:", storageError);
-
-      if (storageError) {
-        throw new Error(`Storage delete failed: ${storageError.message}`);
-      }
-
-      setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
-    } catch (err: any) {
-      console.error("Delete failed:", err);
-      setActionError(err.message || "Delete failed.");
-    } finally {
-      setDeletingLessonId(null);
-    }
-  };
-
+  // Toggles the 'published' status of a lesson (locks/unlocks for students)
   const handleToggleLessonPublish = async (lesson: Lesson) => {
     setActionError(null);
     try {
@@ -322,33 +371,51 @@ function CourseContent() {
     }
   };
 
-  const handleDeleteQuiz = async (quiz: Quiz) => {
-    if (pendingDeleteQuiz !== quiz.id) {
-      setPendingDeleteQuiz(quiz.id);
-      return;
-    }
+  // Handles quiz deletion with a double-click confirmation pattern.
+  // The first click arms the confirmation; a second click within 3s deletes.
+  // The pending state auto-resets after 3 seconds so it doesn't stay armed forever.
+  const handleDeleteQuiz = useCallback(
+    async (quiz: Quiz) => {
+      if (pendingDeleteQuiz !== quiz.id) {
+        // First click: arm the confirmation
+        setPendingDeleteQuiz(quiz.id);
 
-    setActionError(null);
-    try {
-      setDeletingQuizId(quiz.id);
+        // Clear any previous timer, then set a new 3-second reset
+        if (pendingDeleteQuizTimerRef.current)
+          clearTimeout(pendingDeleteQuizTimerRef.current);
+        pendingDeleteQuizTimerRef.current = setTimeout(() => {
+          setPendingDeleteQuiz(null);
+        }, 3000);
+        return;
+      }
 
-      const { error: dbError } = await supabase
-        .from("quizzes")
-        .delete()
-        .eq("id", quiz.id);
-      if (dbError)
-        throw new Error(`Database delete failed: ${dbError.message}`);
-
-      setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
+      // Second click within 3s: proceed with deletion
+      if (pendingDeleteQuizTimerRef.current)
+        clearTimeout(pendingDeleteQuizTimerRef.current);
       setPendingDeleteQuiz(null);
-    } catch (err: any) {
-      console.error("Delete failed:", err);
-      setActionError(err.message || "Delete failed.");
-    } finally {
-      setDeletingQuizId(null);
-    }
-  };
 
+      setActionError(null);
+      try {
+        setDeletingQuizId(quiz.id);
+        const { error: dbError } = await supabase
+          .from("quizzes")
+          .delete()
+          .eq("id", quiz.id);
+        if (dbError)
+          throw new Error(`Database delete failed: ${dbError.message}`);
+
+        setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
+      } catch (err: any) {
+        console.error("Delete failed:", err);
+        setActionError(err.message || "Delete failed.");
+      } finally {
+        setDeletingQuizId(null);
+      }
+    },
+    [pendingDeleteQuiz, supabase],
+  );
+
+  // Toggles quiz visibility for students
   const handleToggleQuizPublish = async (quiz: Quiz) => {
     setActionError(null);
     try {
@@ -367,6 +434,9 @@ function CourseContent() {
     }
   };
 
+  // UI Rendering Logic
+
+  // Loading Screen
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F5F1E6]">
@@ -377,6 +447,7 @@ function CourseContent() {
     );
   }
 
+  // Error Screen
   if (!course) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#F5F1E6]">
@@ -385,6 +456,7 @@ function CourseContent() {
     );
   }
 
+  // Filter content: Teachers see everything; Students only see 'published' content
   const visibleLessons = isTeacher
     ? lessons
     : lessons.filter((l) => l.published);
@@ -394,6 +466,7 @@ function CourseContent() {
 
   return (
     <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
+      {/* Navigation Header */}
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
         <div className="mx-auto flex items-center justify-between">
           <Link
@@ -430,6 +503,7 @@ function CourseContent() {
       </header>
 
       <main className="mx-auto space-y-8 px-6 py-12">
+        {/* Course Info Section */}
         <section className="rounded-3xl bg-zinc-900 p-10 text-white shadow-2xl">
           <h1 className="text-2xl font-black sm:text-3xl md:text-4xl lg:text-5xl">
             {course.name}
@@ -468,6 +542,7 @@ function CourseContent() {
           </div>
         )}
 
+        {/* Enrollment / About Section */}
         <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -514,6 +589,7 @@ function CourseContent() {
           )}
         </div>
 
+        {/* Lessons Section */}
         <div className="w-full space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -563,15 +639,23 @@ function CourseContent() {
                       rel="noreferrer"
                       className="flex min-w-0 flex-1 items-center gap-4"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-800">
-                        <FileText size={20} />
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                          l.published
+                            ? "bg-zinc-100 text-zinc-800"
+                            : "bg-zinc-50 text-zinc-300"
+                        }`}
+                      >
+                        {l.published ? (
+                          <FileText size={20} />
+                        ) : (
+                          <Lock size={20} />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-lg font-bold group-hover:text-black">
-                            {l.title}
-                          </h3>
-                        </div>
+                        <h3 className="truncate text-lg font-bold group-hover:text-black">
+                          {l.title}
+                        </h3>
                         <p className="truncate text-xs text-zinc-500">
                           {l.fileName}
                         </p>
@@ -583,29 +667,36 @@ function CourseContent() {
                           <button
                             type="button"
                             onClick={() => handleToggleLessonPublish(l)}
-                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${l.published ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
+                              l.published
+                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                            }`}
                           >
-                            {l.published ? "unlocked" : "locked"}
+                            {l.published ? "Unpublish" : "Publish"}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteLesson(l)}
                             disabled={deletingLessonId === l.id}
-                            className="rounded-lg p-2 text-zinc-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                            title="Delete lesson"
+                            title={
+                              pendingDeleteLesson === l.id
+                                ? "Click again to confirm deletion"
+                                : "Delete lesson"
+                            }
+                            className={`rounded-lg p-2 transition disabled:opacity-50 ${
+                              pendingDeleteLesson === l.id
+                                ? "bg-red-100 text-red-600"
+                                : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                            }`}
                           >
                             <Trash2 size={18} />
                           </button>
                         </>
                       )}
-                      <a
-                        href={l.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-zinc-300 transition-colors hover:text-zinc-800"
-                      >
-                        {l.published && <ChevronRight size={20} />}
-                      </a>
+                      {l.published && (
+                        <ChevronRight size={20} className="text-zinc-300" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -614,6 +705,7 @@ function CourseContent() {
           )}
         </div>
 
+        {/* Quizzes Section */}
         <div className="w-full space-y-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="flex items-center gap-2 text-2xl font-bold">
@@ -636,11 +728,16 @@ function CourseContent() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {visibleQuizzes.map((q) => {
+                // Quiz Card UI
                 const card = (
                   <div className="flex items-center justify-between rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
                     <div className="flex items-center gap-4">
                       <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${q.published ? "bg-zinc-100 text-zinc-800" : "bg-zinc-50 text-zinc-300"}`}
+                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                          q.published
+                            ? "bg-zinc-100 text-zinc-800"
+                            : "bg-zinc-50 text-zinc-300"
+                        }`}
                       >
                         {q.published ? (
                           <FileQuestion size={20} />
@@ -649,11 +746,9 @@ function CourseContent() {
                         )}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-lg font-bold group-hover:text-black">
-                            {q.title}
-                          </h3>
-                        </div>
+                        <h3 className="truncate text-lg font-bold group-hover:text-black">
+                          {q.title}
+                        </h3>
                         {q.dueDate && (
                           <p className="truncate text-xs text-zinc-500">
                             Due {q.dueDate}
@@ -670,58 +765,59 @@ function CourseContent() {
                               e.preventDefault();
                               handleToggleQuizPublish(q);
                             }}
-                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${q.published ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
+                              q.published
+                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                            }`}
                           >
-                            {q.published ? "unlocked" : "locked"}
+                            {q.published ? "Unpublish" : "Publish"}
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteQuiz(q)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteQuiz(q);
+                            }}
                             disabled={deletingQuizId === q.id}
-                            className={`rounded-lg p-2 transition disabled:opacity-50 ${pendingDeleteQuiz === q.id ? "bg-red-100 text-red-600" : "text-zinc-400 hover:bg-red-50 hover:text-red-600"}`}
                             title={
                               pendingDeleteQuiz === q.id
-                                ? "Click again to confirm"
+                                ? "Click again to confirm deletion"
                                 : "Delete quiz"
                             }
+                            className={`rounded-lg p-2 transition disabled:opacity-50 ${
+                              pendingDeleteQuiz === q.id
+                                ? "bg-red-100 text-red-600"
+                                : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                            }`}
                           >
                             <Trash2 size={18} />
                           </button>
                         </>
                       )}
-
+                      {/* Show Student Score */}
                       {grades.find((g) => g.quizId === q.id) && (
                         <p className="text-xs text-zinc-500">
                           {grades.find((g) => g.quizId === q.id)?.score}%
                         </p>
                       )}
-
                       {q.published && (
-                        <ChevronRight
-                          size={20}
-                          className="text-zinc-300 transition-colors hover:text-zinc-800"
-                        />
+                        <ChevronRight size={20} className="text-zinc-300" />
                       )}
                     </div>
                   </div>
                 );
 
-                return q.published ? (
-                  <div key={q.id}>
-                    {isTeacher ? (
-                      <div className="block">{card}</div>
-                    ) : (
-                      <Link
-                        href={`/pages/quiz/${q.id}`}
-                        className="group block"
-                      >
+                // Only show the card if the quiz is accessible
+                return (
+                  <div key={q.id} className="group">
+                    {q.published && !isTeacher ? (
+                      <Link href={`/pages/quiz/${q.id}`} className="block">
                         {card}
                       </Link>
+                    ) : (
+                      <div className="block">{card}</div>
                     )}
-                  </div>
-                ) : (
-                  <div key={q.id} className="block">
-                    {card}
                   </div>
                 );
               })}
@@ -733,6 +829,7 @@ function CourseContent() {
   );
 }
 
+// Wrapper component to ensure only logged-in users can access the current page
 export default function CoursePage() {
   return (
     <AuthGuard>

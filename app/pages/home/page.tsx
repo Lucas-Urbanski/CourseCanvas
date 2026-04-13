@@ -8,6 +8,7 @@ import CourseCard from "../../components/courseCard";
 import { useAuth } from "../../context/AuthContext";
 import AuthGuard from "../../components/AuthGuard";
 
+// Define the shape of a Course object for type safety
 type Course = {
   id: string;
   title: string;
@@ -21,6 +22,7 @@ type Course = {
 };
 
 function HomeContent() {
+  // Initialize Supabase client once using useMemo to avoid recreation on re-renders
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -31,10 +33,13 @@ function HomeContent() {
   );
 
   const { user, loading } = useAuth();
-  const isTeacher = user?.role === "instructor";
+  const isTeacher = user?.role === "instructor"; // Check user role for conditional rendering
 
+  // State management for courses, loading status, errors, and search functionality
   const [courses, setCourses] = useState<Course[]>([]);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [completedCourses, setCompletedCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [coursesError, setCoursesError] = useState<string | null>(null);
@@ -42,10 +47,15 @@ function HomeContent() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
+  // Completion Logic: A course is complete if the student has a grade for every published quiz in that course.
   const computeCompletedIds = useCallback(
-    async (rawCourses: any[], courseIdsToCheck: string[]): Promise<Set<string>> => {
+    async (
+      _rawCourses: any[],
+      courseIdsToCheck: string[],
+    ): Promise<Set<string>> => {
       if (courseIdsToCheck.length === 0) return new Set();
 
+      // Parallel fetch for published quizzes and student grades across multiple courses
       const [{ data: quizData }, { data: gradeData }] = await Promise.all([
         supabase
           .from("quizzes")
@@ -59,26 +69,34 @@ function HomeContent() {
           .in("courseId", courseIdsToCheck),
       ]);
 
-      const gradedQuizIds = new Set((gradeData ?? []).map((g: any) => g.quizId));
+      const gradedQuizIds = new Set(
+        (gradeData ?? []).map((g: any) => g.quizId),
+      );
 
       return new Set(
         courseIdsToCheck.filter((courseId) => {
           const quizIds = (quizData ?? [])
             .filter((q: any) => q.courseId === courseId)
             .map((q: any) => q.id);
-          return quizIds.length > 0 && quizIds.every((id: string) => gradedQuizIds.has(id));
+          // Return true only if quizzes exist and every quiz ID is found in the student's grades
+          return (
+            quizIds.length > 0 &&
+            quizIds.every((id: string) => gradedQuizIds.has(id))
+          );
         }),
       );
     },
     [supabase, user],
   );
-
+  
+  // Fetches the main course list and student-specific enrollment/completion status
   const fetchCourses = useCallback(async () => {
     if (!user?.id) return;
     setCoursesLoading(true);
     setCoursesError(null);
 
     try {
+      // 1. Fetch all courses joined with instructor profile names
       const { data, error } = await supabase
         .from("courses")
         .select(
@@ -88,6 +106,7 @@ function HomeContent() {
 
       if (error) throw error;
 
+      // 2. Student-specific logic: Fetch enrollments and calculate completions
       if (user.role !== "instructor") {
         const { data: enrollments, error: enrollError } = await supabase
           .from("enrollments")
@@ -98,6 +117,7 @@ function HomeContent() {
 
         let enrolledIds = (enrollments ?? []).map((e: any) => e.courseId);
 
+        // Filter for courses that have passed their end date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const allPastCourseIds = (data ?? [])
@@ -109,8 +129,12 @@ function HomeContent() {
           })
           .map((c: any) => c.id);
 
-        const completedIds = await computeCompletedIds(data ?? [], allPastCourseIds);
+        const completedIds = await computeCompletedIds(
+          data ?? [],
+          allPastCourseIds,
+        );
 
+        // Auto-cleanup: If a course is marked completed, remove it from active enrollments in the DB
         if (completedIds.size > 0) {
           const stillEnrolledAndCompleted = enrolledIds.filter((id) =>
             completedIds.has(id),
@@ -122,9 +146,11 @@ function HomeContent() {
               .eq("studentId", user.id)
               .in("courseId", stillEnrolledAndCompleted);
           }
+          // Remove completed IDs from the local "active enrollment" list
           enrolledIds = enrolledIds.filter((id) => !completedIds.has(id));
         }
 
+        // Map raw database data to the Course type
         const mapped: Course[] = (data ?? []).map((c: any) => ({
           id: c.id,
           title: c.title,
@@ -141,6 +167,7 @@ function HomeContent() {
         setCourses(mapped);
         setCompletedCourses(mapped.filter((c) => c.isCompleted));
       } else {
+        // Teacher logic: Just map the courses without enrollment checks
         setCourses(
           (data ?? []).map((c: any) => ({
             id: c.id,
@@ -162,10 +189,12 @@ function HomeContent() {
     }
   }, [supabase, user, computeCompletedIds]);
 
+  // Initial data fetch on component mount
   useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
 
+  // Action: Enroll a student in a course
   const handleEnroll = async (courseId: string) => {
     if (!user) return;
     setActionError(null);
@@ -177,12 +206,14 @@ function HomeContent() {
 
       if (error) {
         if (error.code === "23505") {
+          // Unique constraint error (already enrolled)
           setActionError("You are already enrolled in this course.");
           return;
         }
         throw error;
       }
 
+      // Re-calculate completion status and update UI
       const newEnrolledIds = [...enrolledCourseIds, courseId];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -207,6 +238,7 @@ function HomeContent() {
     }
   };
 
+  // Action: Unenroll a student from a course
   const handleUnenroll = async (courseId: string) => {
     if (!user) return;
     setActionError(null);
@@ -220,23 +252,11 @@ function HomeContent() {
 
       if (error) throw error;
 
-      const newEnrolledIds = [...enrolledCourseIds].filter((id) => id !== courseId);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const allPastCourseIds = courses
-        .filter((c) => {
-          if (!c.endDate) return false;
-          const ended = new Date(c.endDate);
-          ended.setHours(0, 0, 0, 0);
-          return ended <= today;
-        })
-        .map((c) => c.id);
-      const completedIds = await computeCompletedIds(courses, allPastCourseIds);
-
-      setEnrolledCourseIds(new Set(newEnrolledIds));
-      setCourses((prev) =>
-        prev.map((c) => ({ ...c, isCompleted: completedIds.has(c.id) })),
+      const newEnrolledIds = [...enrolledCourseIds].filter(
+        (id) => id !== courseId,
       );
+      // Update state locally for immediate UI feedback
+      setEnrolledCourseIds(new Set(newEnrolledIds));
       setActionSuccess("Successfully unenrolled.");
     } catch (err: any) {
       console.error("Unenroll error:", err);
@@ -244,6 +264,7 @@ function HomeContent() {
     }
   };
 
+  // Action: Instructor deleting their own course
   const handleDelete = async (courseId: string) => {
     if (!user) return;
     setActionError(null);
@@ -268,19 +289,17 @@ function HomeContent() {
     }
   };
 
+  // Logic for filtering courses based on the search bar (title or category)
   const filteredCourses = courses.filter(
     (c) =>
       c.title.toLowerCase().includes(search.toLowerCase()) ||
       c.category.toLowerCase().includes(search.toLowerCase()),
   );
 
+  // Split filtered courses into categories based on user role and status
   const myCourses = isTeacher
     ? filteredCourses.filter((c) => c.instructorId === user?.id)
     : [];
-  const otherCourses = isTeacher
-    ? filteredCourses.filter((c) => c.instructorId !== user?.id)
-    : [];
-
   const filteredCompleted = !isTeacher
     ? completedCourses.filter(
         (c) =>
@@ -289,14 +308,19 @@ function HomeContent() {
       )
     : [];
   const enrolledCourses = !isTeacher
-    ? filteredCourses.filter((c) => enrolledCourseIds.has(c.id) && !c.isCompleted)
+    ? filteredCourses.filter(
+        (c) => enrolledCourseIds.has(c.id) && !c.isCompleted,
+      )
     : [];
   const browseCourses = !isTeacher
-    ? filteredCourses.filter((c) => !enrolledCourseIds.has(c.id) && !c.isCompleted)
+    ? filteredCourses.filter(
+        (c) => !enrolledCourseIds.has(c.id) && !c.isCompleted,
+      )
     : [];
 
   return (
     <div className="min-h-screen bg-[#F5F1E6] text-zinc-800">
+      {/* Top Navigation Bar */}
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 px-8 py-4 backdrop-blur-lg">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link
@@ -311,6 +335,7 @@ function HomeContent() {
             </span>
           </Link>
 
+          {/* Search Input */}
           <div className="relative mx-4 max-w-md flex-1">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
@@ -338,13 +363,17 @@ function HomeContent() {
               href="/pages/settings"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
             >
-              <Settings size={20} className="transition-transform hover:rotate-45" />
+              <Settings
+                size={20}
+                className="transition-transform hover:rotate-45"
+              />
             </Link>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl p-8">
+        {/* Loading State UI */}
         {loading || coursesLoading ? (
           <div className="flex min-h-[50vh] items-center justify-center">
             <div className="flex items-center gap-3 text-zinc-500">
@@ -358,6 +387,7 @@ function HomeContent() {
           </div>
         ) : (
           <div className="space-y-10">
+            {/* Create Course Button */}
             {isTeacher && (
               <div className="flex items-center justify-center">
                 <Link
@@ -370,6 +400,7 @@ function HomeContent() {
               </div>
             )}
 
+            {/* Action Notifications */}
             {actionError && (
               <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {actionError}
@@ -381,12 +412,14 @@ function HomeContent() {
               </div>
             )}
 
-            {/* Teacher view */}
+            {/* Teacher UI */}
             {isTeacher && (
               <>
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">My Courses</h2>
+                    <h2 className="text-xl font-bold text-zinc-900">
+                      My Courses
+                    </h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {myCourses.length}
                     </span>
@@ -394,40 +427,21 @@ function HomeContent() {
                   <div className="rounded-3xl border border-zinc-300 bg-white/50 p-8 shadow-sm">
                     {myCourses.length === 0 ? (
                       <p className="py-10 text-center text-zinc-400">
-                        {search ? "No matching courses." : "You haven't created any courses yet."}
+                        {search
+                          ? "No matching courses."
+                          : "You haven't created any courses yet."}
                       </p>
                     ) : (
                       <CourseCard courses={myCourses} onDelete={handleDelete} />
                     )}
                   </div>
                 </section>
-
-                {(otherCourses.length > 0 || !search) && (
-                  <section className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                      <h2 className="text-xl font-bold text-zinc-900">Other Courses</h2>
-                      <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
-                        {otherCourses.length}
-                      </span>
-                    </div>
-                    <div className="rounded-3xl border border-zinc-300 bg-white/50 p-8 shadow-sm">
-                      {otherCourses.length === 0 ? (
-                        <p className="py-10 text-center text-zinc-400">
-                          No other courses available.
-                        </p>
-                      ) : (
-                        <CourseCard courses={otherCourses} />
-                      )}
-                    </div>
-                  </section>
-                )}
               </>
             )}
 
-            {/* Student View */}
+            {/* Student UI */}
             {!isTeacher && (
               <>
-                {/* Completed Courses — amber section, certificate modal on click */}
                 {filteredCompleted.length > 0 && (
                   <section className="space-y-4">
                     <div className="flex items-center justify-between px-1">
@@ -444,10 +458,11 @@ function HomeContent() {
                   </section>
                 )}
 
-                {/* Enrolled Courses */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">Enrolled Courses</h2>
+                    <h2 className="text-xl font-bold text-zinc-900">
+                      Enrolled Courses
+                    </h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {enrolledCourses.length}
                     </span>
@@ -460,15 +475,19 @@ function HomeContent() {
                           : "You haven't enrolled in any courses yet."}
                       </p>
                     ) : (
-                      <CourseCard courses={enrolledCourses} onUnenroll={handleUnenroll} />
+                      <CourseCard
+                        courses={enrolledCourses}
+                        onUnenroll={handleUnenroll}
+                      />
                     )}
                   </div>
                 </section>
 
-                {/* Browse Courses */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between px-1">
-                    <h2 className="text-xl font-bold text-zinc-900">Browse Courses</h2>
+                    <h2 className="text-xl font-bold text-zinc-900">
+                      Browse Courses
+                    </h2>
                     <span className="rounded-full bg-white/80 px-3 py-0.5 text-xs font-semibold text-zinc-600">
                       {browseCourses.length}
                     </span>
@@ -481,7 +500,10 @@ function HomeContent() {
                           : "No other courses available right now."}
                       </p>
                     ) : (
-                      <CourseCard courses={browseCourses} onEnroll={handleEnroll} />
+                      <CourseCard
+                        courses={browseCourses}
+                        onEnroll={handleEnroll}
+                      />
                     )}
                   </div>
                 </section>
@@ -494,6 +516,7 @@ function HomeContent() {
   );
 }
 
+// Wrapper component to ensure authentication before rendering HomeContent
 export default function Home() {
   return (
     <AuthGuard>

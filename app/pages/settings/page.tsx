@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import AuthGuard from "../../components/AuthGuard";
 
 function SettingsContent() {
+  // Memoize the Supabase client to prevent unnecessary re-initialization on re-renders
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -26,20 +27,25 @@ function SettingsContent() {
     [],
   );
 
+  // Extract user data and logout function from the Auth Context
   const { user, loading: authLoading, signOut } = useAuth();
 
+  // Loading states for data fetching and form submission
   const [profileLoading, setProfileLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // State variables for form inputs
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // State variables for user feedback like errors and success messages
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState(false);
 
+  // Fetch the user's profile information from the database when the component mounts or the user changes
   useEffect(() => {
     if (!user) return;
     const getProfile = async () => {
@@ -50,6 +56,7 @@ function SettingsContent() {
         .eq("id", user.id)
         .single();
 
+      // Populate local state with fetched data or fallback to defaults
       setFullName(profile?.fullName || user.name || "");
       setBio(profile?.bio || "");
       setAvatarUrl(profile?.avatarUrl || "");
@@ -58,12 +65,14 @@ function SettingsContent() {
     getProfile();
   }, [user?.id, supabase]);
 
+  // Function to handle profile updates and password changes
   async function saveProfile() {
     if (!user) return;
 
     setFormError(null);
     setFormSuccess(false);
 
+    // Basic password validation
     if (newPassword && newPassword.length < 6) {
       setFormError("New password must be at least 6 characters.");
       return;
@@ -75,6 +84,7 @@ function SettingsContent() {
 
     setIsSaving(true);
 
+    // Update profile information in the Supabase 'profiles' table
     const { error: profileError } = await supabase
       .from("profiles")
       .update({ fullName: fullName, bio, avatarUrl: avatarUrl })
@@ -86,6 +96,7 @@ function SettingsContent() {
       return;
     }
 
+    // If the user entered a new password, update the Auth user metadata
     if (newPassword) {
       const { error: authError } = await supabase.auth.updateUser({
         password: newPassword,
@@ -97,6 +108,7 @@ function SettingsContent() {
         return;
       }
 
+      // Clear password fields after successful update
       setNewPassword("");
       setConfirmPassword("");
     }
@@ -105,6 +117,7 @@ function SettingsContent() {
     setIsSaving(false);
   }
 
+  // Global loading screen while authentication or profile data is being resolved
   if (authLoading || profileLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#F5F1E6] text-zinc-800">
@@ -117,7 +130,7 @@ function SettingsContent() {
   return (
     <main className="min-h-screen bg-[#F5F1E6] px-6 py-12 text-zinc-800">
       <div className="mx-auto max-w-2xl">
-        {/* Header */}
+        {/* Header Navigation and Logout */}
         <div className="mb-12 flex items-center justify-between">
           <Link href="/pages/home" className="group flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 text-[#F5F1E6] transition-transform group-hover:scale-95">
@@ -141,11 +154,12 @@ function SettingsContent() {
         </div>
 
         <div className="space-y-8">
-          {/* Identity */}
+          {/* Identity Section */}
           <section className="rounded-[2.5rem] border border-zinc-200 bg-white p-10 shadow-sm">
             <div className="mb-10 flex flex-col items-center sm:flex-row sm:gap-8">
               <div className="relative mb-4 sm:mb-0">
                 <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-zinc-50 bg-zinc-100 shadow-inner">
+                  {/* Display avatar or initials */}
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
@@ -158,6 +172,7 @@ function SettingsContent() {
                     </div>
                   )}
                 </div>
+                {/* Button to Generate Avatar */}
                 <button
                   onClick={() =>
                     setAvatarUrl(
@@ -178,6 +193,7 @@ function SettingsContent() {
             </div>
 
             <div className="grid gap-6">
+              {/* Full Name Input */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
                   <User size={14} /> Legal Name
@@ -190,6 +206,7 @@ function SettingsContent() {
                 />
               </div>
 
+              {/* Bio Textarea */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
                   <Info size={14} /> Short Bio
@@ -205,7 +222,7 @@ function SettingsContent() {
             </div>
           </section>
 
-          {/* Security */}
+          {/* Security Section */}
           <section className="rounded-[2.5rem] border border-zinc-200 bg-white p-10 shadow-sm">
             <div className="mb-8">
               <h2 className="text-2xl font-black flex items-center gap-2">
@@ -217,6 +234,7 @@ function SettingsContent() {
             </div>
 
             <div className="grid gap-4">
+              {/* New Password Input */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
                   <ShieldCheck size={14} /> New Password
@@ -229,6 +247,7 @@ function SettingsContent() {
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
               </div>
+              {/* Confirm Password Input */}
               <input
                 type="password"
                 placeholder="Confirm new password"
@@ -238,7 +257,7 @@ function SettingsContent() {
               />
             </div>
 
-            {/* Notifications */}
+            {/* Success/Error Notification */}
             <div className="mt-6 min-h-[20px]">
               {formError && (
                 <p className="text-sm font-bold text-red-500 animate-in fade-in slide-in-from-top-1">
@@ -253,7 +272,7 @@ function SettingsContent() {
             </div>
           </section>
 
-          {/* Persistent Save Button */}
+          {/* Save Changes Button */}
           <div className="flex justify-center pt-4">
             <button
               onClick={saveProfile}
@@ -274,6 +293,7 @@ function SettingsContent() {
   );
 }
 
+// Wrapper component to ensure the page is only accessible when authenticated
 export default function Settings() {
   return (
     <AuthGuard>

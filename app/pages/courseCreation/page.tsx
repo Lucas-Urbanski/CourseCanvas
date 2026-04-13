@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import AuthGuard from "../../components/AuthGuard";
 
 function CourseCreationContent() {
+  // Memoize the Supabase client to ensure it's only created once on the client side
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -25,22 +26,29 @@ function CourseCreationContent() {
       ),
     [],
   );
+  // Next.js router for navigation
+  const router = useRouter(); 
 
-  const router = useRouter();
-  const { user } = useAuth();
+  // Access current authenticated user from context
+  const { user } = useAuth(); 
 
+  // Local state for form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [creating, setCreating] = useState(false);
 
+  // Loading state for the submission
+  const [creating, setCreating] = useState(false); 
+
+  // Function to handle database insertion
   const handleCreateCourse = async () => {
     if (!user) {
       return;
     }
 
+    // Basic validation to ensure title is not empty
     if (!title.trim()) {
       alert("Please enter a course title.");
       return;
@@ -49,29 +57,34 @@ function CourseCreationContent() {
     try {
       setCreating(true);
 
+      // Insert form data into the "courses" table in Supabase
       const { data, error } = await supabase
         .from("courses")
         .insert({
           title,
           description,
           category,
-          instructorId: user.id,
+          // Links the course to the current user
+          instructorId: user.id, 
           startDate: startDate || null,
           endDate: endDate || null,
         })
-        .select("id")
+        // Retrieve the new ID to redirect the user
+        .select("id") 
         .single();
 
       if (error) {
         throw error;
       }
 
+      // Reset form fields after successful creation
       setTitle("");
       setDescription("");
       setCategory("");
       setStartDate("");
       setEndDate("");
 
+      // Redirect user to the newly created course page
       router.push(`/pages/course/${data.id}`);
     } catch (error: any) {
       console.error("Error creating course:", error);
@@ -83,6 +96,7 @@ function CourseCreationContent() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F1E6] font-sans text-zinc-800">
+      {/* Navigation Header */}
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/70 px-8 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link
@@ -114,6 +128,7 @@ function CourseCreationContent() {
         </div>
       </header>
 
+      {/* Input Form */}
       <main className="flex flex-1 flex-col items-center px-6 py-16">
         <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-10 shadow-xl shadow-zinc-200/50">
           <div className="mb-10">
@@ -128,10 +143,12 @@ function CourseCreationContent() {
           <form
             className="space-y-8"
             onSubmit={(e) => {
-              e.preventDefault();
+              // Prevent page reload on submit
+              e.preventDefault(); 
               handleCreateCourse();
             }}
           >
+            {/* Course Title Input */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <Type size={14} /> Course Title
@@ -145,6 +162,7 @@ function CourseCreationContent() {
               />
             </div>
 
+            {/* Category Input */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <Tag size={14} /> Category
@@ -158,6 +176,7 @@ function CourseCreationContent() {
               />
             </div>
 
+            {/* Description Textarea */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <FileText size={14} /> Description
@@ -171,6 +190,7 @@ function CourseCreationContent() {
               />
             </div>
 
+            {/* Date Selection */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
@@ -197,6 +217,7 @@ function CourseCreationContent() {
               </div>
             </div>
 
+            {/* Submission Button */}
             <div className="pt-6">
               <button
                 type="submit"
@@ -214,6 +235,7 @@ function CourseCreationContent() {
   );
 }
 
+// Wrapper component to ensure only logged-in users can access the current page
 export default function CourseCreation() {
   return (
     <AuthGuard>
