@@ -46,7 +46,7 @@ function CertificateModal({
       // Close if clicking outside the certificate
       onClick={onClose} 
     >
-      /* Modal Container */
+      {/* Modal Container */}
       <div
         className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
         // Prevent closing when clicking inside the certificate

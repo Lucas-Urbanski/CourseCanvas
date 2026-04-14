@@ -298,60 +298,41 @@ function CourseContent() {
   // Deletes a lesson from both Database and Storage using a double-click confirmation
   // pattern. The first click arms the button (turns red, 3s auto-reset); the second
   // click within that window performs the deletion — no browser confirm() dialog needed.
-  const handleDeleteLesson = useCallback(
-    async (lesson: Lesson) => {
-      if (pendingDeleteLesson !== lesson.id) {
-        // First click: arm the confirmation
-        setPendingDeleteLesson(lesson.id);
+  const handleDeleteLesson = async (lesson: Lesson) => {
+    if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
+      return;
+    }
 
-        if (pendingDeleteLessonTimerRef.current)
-          clearTimeout(pendingDeleteLessonTimerRef.current);
-        pendingDeleteLessonTimerRef.current = setTimeout(() => {
-          setPendingDeleteLesson(null);
-        }, 3000);
-        return;
+    setActionError(null);
+    try {
+      setDeletingLessonId(lesson.id);
+
+      const { error: storageError } = await supabase.storage
+        .from("lesson-files")
+        .remove([lesson.filePath]);
+
+      if (storageError) {
+        throw new Error(`Storage delete failed: ${storageError.message}`);
       }
 
-      // Second click within 3s: proceed with deletion
-      if (pendingDeleteLessonTimerRef.current)
-        clearTimeout(pendingDeleteLessonTimerRef.current);
+      const { error: dbError } = await supabase
+        .from("lessons")
+        .delete()
+        .eq("id", lesson.id);
+
+      if (dbError) {
+        throw new Error(`Database delete failed: ${dbError.message}`);
+      }
+
+      setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
       setPendingDeleteLesson(null);
-
-      setActionError(null);
-      try {
-        setDeletingLessonId(lesson.id);
-
-        // 1. Delete from DB
-        const { data: dbData, error: dbError } = await supabase
-          .from("lessons")
-          .delete()
-          .eq("id", Number(lesson.id))
-          .select();
-
-        if (dbError)
-          throw new Error(`Database delete failed: ${dbError.message}`);
-        if (!dbData || dbData.length === 0)
-          throw new Error("Lesson was not deleted from the database.");
-
-        // 2. Delete from Storage
-        const { error: storageError } = await supabase.storage
-          .from("lesson-files")
-          .remove([lesson.filePath]);
-        if (storageError)
-          throw new Error(`Storage delete failed: ${storageError.message}`);
-
-        // Update local state
-        setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
-      } catch (err: any) {
-        console.error("Delete failed:", err);
-        setActionError(err.message || "Delete failed.");
-      } finally {
-        setDeletingLessonId(null);
-      }
-    },
-    [pendingDeleteLesson, supabase],
-  );
-
+    } catch (err: any) {
+      console.error("Delete failed:", err);
+      setActionError(err.message || "Delete failed.");
+    } finally {
+      setDeletingLessonId(null);
+    }
+  };
   // Toggles the 'published' status of a lesson (locks/unlocks for students)
   const handleToggleLessonPublish = async (lesson: Lesson) => {
     setActionError(null);
@@ -359,7 +340,7 @@ function CourseContent() {
       const { error } = await supabase
         .from("lessons")
         .update({ published: !lesson.published })
-        .eq("id", Number(lesson.id));
+        .eq("id", lesson.id);
       if (error) throw error;
       setLessons((prev) =>
         prev.map((l) =>
