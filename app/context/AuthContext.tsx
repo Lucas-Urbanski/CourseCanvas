@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import type { User } from "@supabase/supabase-js";
 
 type UserRole = "student" | "instructor";
 
@@ -42,36 +41,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const mapUser = useCallback(
-    (authUser: User): AuthUser => ({
-      id: authUser.id,
-      email: authUser.email ?? "",
-      name:
-        (authUser.user_metadata?.fullName as string) ||
-        (authUser.email?.split("@")[0] ?? "User"),
-      role: (authUser.user_metadata?.role as UserRole) || "student",
-    }),
-    [],
-  );
-
-  const refreshUser = useCallback(async () => {
+  const loadUser = useCallback(async () => {
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
-    if (authUser) setUser(mapUser(authUser));
-    else setUser(null);
-  }, [supabase, mapUser]);
+
+    if (!authUser) {
+      setUser(null);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("fullName, role")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    setUser({
+      id: authUser.id,
+      email: authUser.email ?? "",
+      name:
+        profile?.fullName ||
+        (authUser.user_metadata?.fullName as string) ||
+        authUser.email?.split("@")[0] ||
+        "User",
+      role: profile?.role === "instructor" ? "instructor" : "student",
+    });
+  }, [supabase]);
+
+  const refreshUser = useCallback(async () => {
+    await loadUser();
+  }, [loadUser]);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadUser = async () => {
+    const init = async () => {
       try {
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        if (!mounted) return;
-        setUser(authUser ? mapUser(authUser) : null);
+        await loadUser();
       } catch (err) {
         console.error("Auth load error:", err);
       } finally {
@@ -79,12 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    loadUser();
+    init();
 
     return () => {
       mounted = false;
     };
-  }, [supabase, mapUser]);
+  }, [loadUser]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

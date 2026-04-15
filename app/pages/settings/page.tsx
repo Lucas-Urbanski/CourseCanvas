@@ -11,6 +11,7 @@ import {
   User,
   ShieldCheck,
   Info,
+  Users,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../context/AuthContext";
@@ -28,7 +29,7 @@ function SettingsContent() {
   );
 
   // Extract user data and logout function from the Auth Context
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, refreshUser } = useAuth();
 
   // Loading states for data fetching and form submission
   const [profileLoading, setProfileLoading] = useState(false);
@@ -38,6 +39,7 @@ function SettingsContent() {
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [role, setRole] = useState<"student" | "instructor">("student");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -48,47 +50,65 @@ function SettingsContent() {
   // Fetch the user's profile information from the database when the component mounts or the user changes
   useEffect(() => {
     if (!user) return;
+
     const getProfile = async () => {
       setProfileLoading(true);
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("fullName, bio, avatarUrl")
-        .eq("id", user.id)
-        .single();
 
-      // Populate local state with fetched data or fallback to defaults
-      setFullName(profile?.fullName || user.name || "");
-      setBio(profile?.bio || "");
-      setAvatarUrl(profile?.avatarUrl || "");
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("fullName, role, bio, avatarUrl")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        setFormError(error.message);
+        setProfileLoading(false);
+        return;
+      }
+
+      setFullName(profile?.fullName ?? user.name ?? "");
+      setBio(profile?.bio ?? "");
+      setAvatarUrl(profile?.avatarUrl ?? "");
+      setRole(profile?.role === "instructor" ? "instructor" : "student");
+
       setProfileLoading(false);
     };
+
     getProfile();
   }, [user?.id, supabase]);
 
-  // Function to handle profile updates and password changes
+  // Function to handle form submission
   async function saveProfile() {
     if (!user) return;
 
     setFormError(null);
     setFormSuccess(false);
 
-    // Basic password validation
+    // Validate form inputs
     if (newPassword && newPassword.length < 6) {
       setFormError("New password must be at least 6 characters.");
       return;
     }
-    if (newPassword !== confirmPassword) {
+
+    if (newPassword && newPassword !== confirmPassword) {
       setFormError("Passwords do not match.");
       return;
     }
 
     setIsSaving(true);
 
-    // Update profile information in the Supabase 'profiles' table
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({ fullName: fullName, bio, avatarUrl: avatarUrl })
-      .eq("id", user.id);
+    const { error: profileError } = await supabase.from("profiles").upsert(
+      [
+        {
+          id: user.id,
+          fullName,
+          role,
+          bio,
+          avatarUrl,
+        },
+      ],
+      { onConflict: "id" },
+    );
 
     if (profileError) {
       setFormError(profileError.message);
@@ -96,7 +116,6 @@ function SettingsContent() {
       return;
     }
 
-    // If the user entered a new password, update the Auth user metadata
     if (newPassword) {
       const { error: authError } = await supabase.auth.updateUser({
         password: newPassword,
@@ -108,12 +127,12 @@ function SettingsContent() {
         return;
       }
 
-      // Clear password fields after successful update
       setNewPassword("");
       setConfirmPassword("");
     }
 
     setFormSuccess(true);
+    await refreshUser();
     setIsSaving(false);
   }
 
@@ -218,6 +237,29 @@ function SettingsContent() {
                   placeholder="Tell us a little about your teaching/learning style..."
                   rows={3}
                 />
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
+                  <Users size={14} /> Role
+                </label>
+                <div className="flex gap-3">
+                  {(["student", "instructor"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={`flex-1 rounded-xl border py-3 text-sm font-semibold capitalize transition ${
+                        role === r
+                          ? "border-zinc-800 bg-zinc-800 text-white"
+                          : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
