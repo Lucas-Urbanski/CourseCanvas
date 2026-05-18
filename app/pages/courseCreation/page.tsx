@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Settings,
   BookOpen,
@@ -11,13 +11,13 @@ import {
   FileText,
   Type,
   Tag,
+  Save,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../context/AuthContext";
 import AuthGuard from "../../components/AuthGuard";
 
 function CourseCreationContent() {
-  // Memoize the Supabase client to ensure it's only created once on the client side
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -26,77 +26,139 @@ function CourseCreationContent() {
       ),
     [],
   );
-  // Next.js router for navigation
-  const router = useRouter(); 
 
-  // Access current authenticated user from context
-  const { user } = useAuth(); 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("courseId");
 
-  // Local state for form fields
+  const { user } = useAuth();
+
+  const isEditMode = !!courseId;
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // Loading state for the submission
-  const [creating, setCreating] = useState(false); 
+  const [creating, setCreating] = useState(false);
+  const [loadingCourse, setLoadingCourse] = useState(false);
+  const [error, setError] = useState("");
 
-  // Function to handle database insertion
-  const handleCreateCourse = async () => {
-    if (!user) {
-      return;
-    }
+  useEffect(() => {
+    if (!courseId || !user?.id) return;
 
-    // Basic validation to ensure title is not empty
+    const fetchCourseForEditing = async () => {
+      setLoadingCourse(true);
+      setError("");
+
+      try {
+        const { data, error } = await supabase
+          .from("courses")
+          .select(
+            `id, title, description, category, "startDate", "endDate", "instructorId"`,
+          )
+          .eq("id", courseId)
+          .single();
+
+        if (error) throw error;
+
+        if (data.instructorId !== user.id) {
+          setError("You are not allowed to edit this course.");
+          return;
+        }
+
+        setTitle(data.title ?? "");
+        setDescription(data.description ?? "");
+        setCategory(data.category ?? "");
+        setStartDate(data.startDate ?? "");
+        setEndDate(data.endDate ?? "");
+      } catch (error: any) {
+        console.error("Error loading course:", error);
+        setError(error?.message || "Failed to load course.");
+      } finally {
+        setLoadingCourse(false);
+      }
+    };
+
+    fetchCourseForEditing();
+  }, [courseId, user?.id, supabase]);
+
+  const handleSaveCourse = async () => {
+    if (!user) return;
+
+    setError("");
+
     if (!title.trim()) {
-      alert("Please enter a course title.");
+      setError("Please enter a course title.");
       return;
     }
 
     try {
       setCreating(true);
 
-      // Insert form data into the "courses" table in Supabase
+      if (isEditMode && courseId) {
+        const { error } = await supabase
+          .from("courses")
+          .update({
+            title,
+            description,
+            category,
+            startDate: startDate || null,
+            endDate: endDate || null,
+            updatedAt: new Date().toISOString(),
+          })
+          .eq("id", courseId)
+          .eq("instructorId", user.id);
+
+        if (error) throw error;
+
+        router.push(`/pages/course/${courseId}`);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("courses")
         .insert({
           title,
           description,
           category,
-          // Links the course to the current user
-          instructorId: user.id, 
+          instructorId: user.id,
           startDate: startDate || null,
           endDate: endDate || null,
         })
-        // Retrieve the new ID to redirect the user
-        .select("id") 
+        .select("id")
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Reset form fields after successful creation
       setTitle("");
       setDescription("");
       setCategory("");
       setStartDate("");
       setEndDate("");
 
-      // Redirect user to the newly created course page
       router.push(`/pages/course/${data.id}`);
     } catch (error: any) {
-      console.error("Error creating course:", error);
-      alert(error?.message || "Failed to create course.");
+      console.error("Error saving course:", error);
+      setError(error?.message || "Failed to save course.");
     } finally {
       setCreating(false);
     }
   };
 
+  if (loadingCourse) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F1E6]">
+        <p className="animate-pulse font-bold text-zinc-500">
+          Loading course details...
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F1E6] font-sans text-zinc-800">
-      {/* Navigation Header */}
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/70 px-8 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link
@@ -111,8 +173,8 @@ function CourseCreationContent() {
             </span>
           </Link>
 
-          <h1 className="ml-4 font-bold text-sm uppercase tracking-widest text-zinc-500 sm:mr-16">
-            New Course
+          <h1 className="ml-4 text-sm font-bold uppercase tracking-widest text-zinc-500 sm:mr-16">
+            {isEditMode ? "Edit Course" : "New Course"}
           </h1>
 
           <Link
@@ -128,27 +190,32 @@ function CourseCreationContent() {
         </div>
       </header>
 
-      {/* Input Form */}
       <main className="flex flex-1 flex-col items-center px-6 py-16">
         <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-10 shadow-xl shadow-zinc-200/50">
           <div className="mb-10">
             <h2 className="mb-2 text-3xl font-black text-zinc-900">
-              Create a Course
+              {isEditMode ? "Edit Course" : "Create a Course"}
             </h2>
             <p className="text-zinc-500">
-              Fill in the details below to launch your new curriculum.
+              {isEditMode
+                ? "Update the course details below and save your changes."
+                : "Fill in the details below to launch your new curriculum."}
             </p>
           </div>
+
+          {error && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
           <form
             className="space-y-8"
             onSubmit={(e) => {
-              // Prevent page reload on submit
-              e.preventDefault(); 
-              handleCreateCourse();
+              e.preventDefault();
+              handleSaveCourse();
             }}
           >
-            {/* Course Title Input */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <Type size={14} /> Course Title
@@ -162,7 +229,6 @@ function CourseCreationContent() {
               />
             </div>
 
-            {/* Category Input */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <Tag size={14} /> Category
@@ -176,7 +242,6 @@ function CourseCreationContent() {
               />
             </div>
 
-            {/* Description Textarea */}
             <div className="flex flex-col gap-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 <FileText size={14} /> Description
@@ -190,7 +255,6 @@ function CourseCreationContent() {
               />
             </div>
 
-            {/* Date Selection */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
@@ -217,15 +281,20 @@ function CourseCreationContent() {
               </div>
             </div>
 
-            {/* Submission Button */}
             <div className="pt-6">
               <button
                 type="submit"
-                disabled={creating}
+                disabled={creating || !!error}
                 className="flex w-full items-center justify-center gap-3 rounded-2xl bg-zinc-900 py-5 font-bold text-[#F5F1E6] shadow-lg shadow-zinc-900/20 transition-all hover:scale-[1.01] hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <PlusCircle size={20} />
-                {creating ? "Creating..." : "Create Course"}
+                {isEditMode ? <Save size={20} /> : <PlusCircle size={20} />}
+                {creating
+                  ? isEditMode
+                    ? "Saving..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Save Changes"
+                    : "Create Course"}
               </button>
             </div>
           </form>
@@ -235,7 +304,6 @@ function CourseCreationContent() {
   );
 }
 
-// Wrapper component to ensure only logged-in users can access the current page
 export default function CourseCreation() {
   return (
     <AuthGuard>
