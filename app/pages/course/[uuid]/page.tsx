@@ -17,6 +17,7 @@ import {
   FileText,
   Users,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../../context/AuthContext";
@@ -88,6 +89,7 @@ function CourseContent() {
 
   // Ref for the hidden file input used in lesson uploads
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Refs to auto-clear the pending delete confirmations after a timeout
   const pendingDeleteQuizTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDeleteLessonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,16 +134,19 @@ function CourseContent() {
               )
               .eq("id", uuid)
               .single(),
+
             // Get all quizzes for this course
             supabase
               .from("quizzes")
               .select(`id, title, timeLimit, "dueDate", published`)
               .eq("courseId", uuid),
+
             // Get enrolled students
             supabase
               .from("enrollments")
               .select(`student:studentId (id, "fullName")`)
               .eq("courseId", uuid),
+
             // Get lessons ordered by most recent
             supabase
               .from("lessons")
@@ -150,6 +155,7 @@ function CourseContent() {
               )
               .eq("courseId", uuid)
               .order("uploadedAt", { ascending: false }),
+
             // Get grades only for the current user
             supabase
               .from("grades")
@@ -236,6 +242,7 @@ function CourseContent() {
       data: { user: liveUser },
       error: userError,
     } = await supabase.auth.getUser();
+
     if (userError || !liveUser) {
       setActionError("Authentication error. Please sign in again.");
       e.target.value = "";
@@ -244,6 +251,7 @@ function CourseContent() {
 
     try {
       setUploading(true);
+
       // Clean filename and create a unique path
       const safeName = file.name.replace(/\s+/g, "_");
       const filePath = `${uuid}/${Date.now()}_${safeName}`;
@@ -252,6 +260,7 @@ function CourseContent() {
       const { error: uploadError } = await supabase.storage
         .from("lesson-files")
         .upload(filePath, file, { upsert: false });
+
       if (uploadError)
         throw new Error(`Storage upload failed: ${uploadError.message}`);
 
@@ -290,14 +299,13 @@ function CourseContent() {
       setActionError(err.message || "Upload failed.");
     } finally {
       setUploading(false);
+
       // Reset input so the same file can be re-uploaded if needed
       e.target.value = "";
     }
   };
 
-  // Deletes a lesson from both Database and Storage using a double-click confirmation
-  // pattern. The first click arms the button (turns red, 3s auto-reset); the second
-  // click within that window performs the deletion — no browser confirm() dialog needed.
+  // Deletes a lesson from both Database and Storage
   const handleDeleteLesson = async (lesson: Lesson) => {
     if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
       return;
@@ -333,7 +341,8 @@ function CourseContent() {
       setDeletingLessonId(null);
     }
   };
-  // Toggles the 'published' status of a lesson (locks/unlocks for students)
+
+  // Toggles the 'published' status of a lesson
   const handleToggleLessonPublish = async (lesson: Lesson) => {
     setActionError(null);
     try {
@@ -341,7 +350,9 @@ function CourseContent() {
         .from("lessons")
         .update({ published: !lesson.published })
         .eq("id", lesson.id);
+
       if (error) throw error;
+
       setLessons((prev) =>
         prev.map((l) =>
           l.id === lesson.id ? { ...l, published: !l.published } : l,
@@ -353,35 +364,35 @@ function CourseContent() {
   };
 
   // Handles quiz deletion with a double-click confirmation pattern.
-  // The first click arms the confirmation; a second click within 3s deletes.
-  // The pending state auto-resets after 3 seconds so it doesn't stay armed forever.
   const handleDeleteQuiz = useCallback(
     async (quiz: Quiz) => {
       if (pendingDeleteQuiz !== quiz.id) {
-        // First click: arm the confirmation
         setPendingDeleteQuiz(quiz.id);
 
-        // Clear any previous timer, then set a new 3-second reset
         if (pendingDeleteQuizTimerRef.current)
           clearTimeout(pendingDeleteQuizTimerRef.current);
+
         pendingDeleteQuizTimerRef.current = setTimeout(() => {
           setPendingDeleteQuiz(null);
         }, 3000);
+
         return;
       }
 
-      // Second click within 3s: proceed with deletion
       if (pendingDeleteQuizTimerRef.current)
         clearTimeout(pendingDeleteQuizTimerRef.current);
-      setPendingDeleteQuiz(null);
 
+      setPendingDeleteQuiz(null);
       setActionError(null);
+
       try {
         setDeletingQuizId(quiz.id);
+
         const { error: dbError } = await supabase
           .from("quizzes")
           .delete()
           .eq("id", quiz.id);
+
         if (dbError)
           throw new Error(`Database delete failed: ${dbError.message}`);
 
@@ -404,7 +415,9 @@ function CourseContent() {
         .from("quizzes")
         .update({ published: !quiz.published })
         .eq("id", quiz.id);
+
       if (error) throw error;
+
       setQuizzes((prev) =>
         prev.map((q) =>
           q.id === quiz.id ? { ...q, published: !q.published } : q,
@@ -414,8 +427,6 @@ function CourseContent() {
       setActionError(err.message || "Failed to update quiz.");
     }
   };
-
-  // UI Rendering Logic
 
   // Loading Screen
   if (loading) {
@@ -437,10 +448,11 @@ function CourseContent() {
     );
   }
 
-  // Filter content: Teachers see everything; Students only see 'published' content
+  // Filter content: Teachers see everything; Students only see published content
   const visibleLessons = isTeacher
     ? lessons
     : lessons.filter((l) => l.published);
+
   const visibleQuizzes = isTeacher
     ? quizzes
     : quizzes.filter((q) => q.published);
@@ -461,6 +473,7 @@ function CourseContent() {
               CourseCanvas
             </span>
           </Link>
+
           <div className="flex items-center gap-4">
             <div className="border-r border-zinc-200 pr-4 text-right">
               <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -470,6 +483,7 @@ function CourseContent() {
                 {user?.name ?? "User"}
               </p>
             </div>
+
             <Link
               href="/pages/settings"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-300 bg-white shadow-sm transition-colors hover:bg-zinc-50"
@@ -489,6 +503,19 @@ function CourseContent() {
           <h1 className="text-2xl font-black sm:text-3xl md:text-4xl lg:text-5xl">
             {course.name}
           </h1>
+
+          {isTeacher && (
+            <div className="mt-6">
+              <Link
+                href={`/pages/courseCreation?courseId=${course.id}`}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold leading-none text-zinc-900 transition hover:bg-zinc-100"
+              >
+                <Pencil size={16} className="shrink-0" />
+                <span>Edit Course</span>
+              </Link>
+            </div>
+          )}
+
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="rounded-xl bg-white/10 p-2">
@@ -501,6 +528,7 @@ function CourseContent() {
                 <p className="text-sm font-semibold">{course.instructor}</p>
               </div>
             </div>
+
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="rounded-xl bg-white/10 p-2">
                 <CalendarDays size={24} />
@@ -534,12 +562,14 @@ function CourseContent() {
               )}
               {isTeacher ? "Class Enrollment" : "About This Course"}
             </h3>
+
             {isTeacher && (
               <span className="rounded bg-zinc-100 px-2 py-1 text-[10px] font-bold text-zinc-500">
                 {students.length} Total
               </span>
             )}
           </div>
+
           {isTeacher ? (
             students.length === 0 ? (
               <p className="py-8 text-center text-zinc-400">
@@ -576,6 +606,7 @@ function CourseContent() {
             <h2 className="flex items-center gap-2 text-2xl font-bold">
               <FileText size={24} /> Lessons
             </h2>
+
             {isTeacher && (
               <>
                 <input
@@ -584,6 +615,7 @@ function CourseContent() {
                   className="hidden"
                   onChange={handleLessonUpload}
                 />
+
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -633,15 +665,18 @@ function CourseContent() {
                           <Lock size={20} />
                         )}
                       </div>
+
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-bold group-hover:text-black">
                           {l.title}
                         </h3>
+
                         <p className="truncate text-xs text-zinc-500">
                           {l.fileName}
                         </p>
                       </div>
                     </a>
+
                     <div className="flex shrink-0 items-center gap-2">
                       {isTeacher && (
                         <>
@@ -656,6 +691,7 @@ function CourseContent() {
                           >
                             {l.published ? "Unpublish" : "Publish"}
                           </button>
+
                           <button
                             type="button"
                             onClick={() => handleDeleteLesson(l)}
@@ -675,6 +711,7 @@ function CourseContent() {
                           </button>
                         </>
                       )}
+
                       {l.published && (
                         <ChevronRight size={20} className="text-zinc-300" />
                       )}
@@ -692,6 +729,7 @@ function CourseContent() {
             <h2 className="flex items-center gap-2 text-2xl font-bold">
               <FileQuestion size={24} /> Quizzes
             </h2>
+
             {isTeacher && (
               <Link
                 href={`/pages/quizCreation?courseId=${uuid}`}
@@ -709,7 +747,6 @@ function CourseContent() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {visibleQuizzes.map((q) => {
-                // Quiz Card UI
                 const card = (
                   <div className="flex items-center justify-between rounded-3xl border border-zinc-200 bg-white p-6 shadow-sm transition-all group-hover:border-zinc-400 group-hover:shadow-md">
                     <div className="flex items-center gap-4">
@@ -726,10 +763,12 @@ function CourseContent() {
                           <Lock size={20} />
                         )}
                       </div>
+
                       <div>
                         <h3 className="truncate text-lg font-bold group-hover:text-black">
                           {q.title}
                         </h3>
+
                         {q.dueDate && (
                           <p className="truncate text-xs text-zinc-500">
                             Due {q.dueDate}
@@ -737,6 +776,7 @@ function CourseContent() {
                         )}
                       </div>
                     </div>
+
                     <div className="flex items-center gap-2">
                       {isTeacher && (
                         <>
@@ -754,6 +794,7 @@ function CourseContent() {
                           >
                             {q.published ? "Unpublish" : "Publish"}
                           </button>
+
                           <button
                             type="button"
                             onClick={(e) => {
@@ -776,12 +817,13 @@ function CourseContent() {
                           </button>
                         </>
                       )}
-                      {/* Show Student Score */}
+
                       {grades.find((g) => g.quizId === q.id) && (
                         <p className="text-xs text-zinc-500">
                           {grades.find((g) => g.quizId === q.id)?.score}%
                         </p>
                       )}
+
                       {q.published && (
                         <ChevronRight size={20} className="text-zinc-300" />
                       )}
@@ -789,7 +831,6 @@ function CourseContent() {
                   </div>
                 );
 
-                // Only show the card if the quiz is accessible
                 return (
                   <div key={q.id} className="group">
                     {q.published && !isTeacher ? (
