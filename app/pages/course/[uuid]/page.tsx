@@ -17,6 +17,7 @@ import {
   FileText,
   Users,
   Trash2,
+  Check,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../../context/AuthContext";
@@ -89,8 +90,12 @@ function CourseContent() {
   // Ref for the hidden file input used in lesson uploads
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Refs to auto-clear the pending delete confirmations after a timeout
-  const pendingDeleteQuizTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingDeleteLessonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDeleteQuizTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const pendingDeleteLessonTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -102,15 +107,21 @@ function CourseContent() {
   const [uploading, setUploading] = useState(false);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
-  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(null);
-  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(null);
+  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<string | null>(
+    null,
+  );
+  const [pendingDeleteQuiz, setPendingDeleteQuiz] = useState<string | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Clear both pending-delete timers on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
-      if (pendingDeleteQuizTimerRef.current) clearTimeout(pendingDeleteQuizTimerRef.current);
-      if (pendingDeleteLessonTimerRef.current) clearTimeout(pendingDeleteLessonTimerRef.current);
+      if (pendingDeleteQuizTimerRef.current)
+        clearTimeout(pendingDeleteQuizTimerRef.current);
+      if (pendingDeleteLessonTimerRef.current)
+        clearTimeout(pendingDeleteLessonTimerRef.current);
     };
   }, []);
 
@@ -223,7 +234,6 @@ function CourseContent() {
   }, [uuid, supabase, user?.id]);
 
   // Handlers for Instructor Actions
-
   // Uploads a file to Supabase Storage and adds a record to the "lessons" table
   const handleLessonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -298,41 +308,57 @@ function CourseContent() {
   // Deletes a lesson from both Database and Storage using a double-click confirmation
   // pattern. The first click arms the button (turns red, 3s auto-reset); the second
   // click within that window performs the deletion — no browser confirm() dialog needed.
-  const handleDeleteLesson = async (lesson: Lesson) => {
-    if (!window.confirm(`Are you sure you want to delete "${lesson.title}"?`)) {
-      return;
-    }
+  const handleDeleteLesson = useCallback(
+    async (lesson: Lesson) => {
+      if (pendingDeleteLesson !== lesson.id) {
+        // First click: arm the confirmation
+        setPendingDeleteLesson(lesson.id);
 
-    setActionError(null);
-    try {
-      setDeletingLessonId(lesson.id);
-
-      const { error: storageError } = await supabase.storage
-        .from("lesson-files")
-        .remove([lesson.filePath]);
-
-      if (storageError) {
-        throw new Error(`Storage delete failed: ${storageError.message}`);
+        if (pendingDeleteLessonTimerRef.current)
+          clearTimeout(pendingDeleteLessonTimerRef.current);
+        pendingDeleteLessonTimerRef.current = setTimeout(() => {
+          setPendingDeleteLesson(null);
+        }, 3000);
+        return;
       }
 
-      const { error: dbError } = await supabase
-        .from("lessons")
-        .delete()
-        .eq("id", lesson.id);
-
-      if (dbError) {
-        throw new Error(`Database delete failed: ${dbError.message}`);
-      }
-
-      setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
+      // Second click within 3s: proceed with deletion
+      if (pendingDeleteLessonTimerRef.current)
+        clearTimeout(pendingDeleteLessonTimerRef.current);
       setPendingDeleteLesson(null);
-    } catch (err: any) {
-      console.error("Delete failed:", err);
-      setActionError(err.message || "Delete failed.");
-    } finally {
-      setDeletingLessonId(null);
-    }
-  };
+
+      setActionError(null);
+      try {
+        setDeletingLessonId(lesson.id);
+
+        const { error: storageError } = await supabase.storage
+          .from("lesson-files")
+          .remove([lesson.filePath]);
+
+        if (storageError) {
+          throw new Error(`Storage delete failed: ${storageError.message}`);
+        }
+
+        const { error: dbError } = await supabase
+          .from("lessons")
+          .delete()
+          .eq("id", lesson.id);
+
+        if (dbError) {
+          throw new Error(`Database delete failed: ${dbError.message}`);
+        }
+
+        setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
+        setPendingDeleteLesson(null);
+      } catch (err: any) {
+        console.error("Delete failed:", err);
+        setActionError(err.message || "Delete failed.");
+      } finally {
+        setDeletingLessonId(null);
+      }
+    },
+    [pendingDeleteLesson, supabase],
+  );
   // Toggles the 'published' status of a lesson (locks/unlocks for students)
   const handleToggleLessonPublish = async (lesson: Lesson) => {
     setActionError(null);
@@ -414,6 +440,10 @@ function CourseContent() {
       setActionError(err.message || "Failed to update quiz.");
     }
   };
+
+  const handleEditQuiz = (quiz : Quiz) => {
+    window.location.href =(`/pages/quizCreation?courseId=${uuid}&quizId=${quiz.id}`);
+  }
 
   // UI Rendering Logic
 
@@ -660,23 +690,19 @@ function CourseContent() {
                             type="button"
                             onClick={() => handleDeleteLesson(l)}
                             disabled={deletingLessonId === l.id}
-                            title={
-                              pendingDeleteLesson === l.id
-                                ? "Click again to confirm deletion"
-                                : "Delete lesson"
-                            }
                             className={`rounded-lg p-2 transition disabled:opacity-50 ${
                               pendingDeleteLesson === l.id
                                 ? "bg-red-100 text-red-600"
                                 : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
                             }`}
                           >
-                            <Trash2 size={18} />
+                            {pendingDeleteLesson === l.id ? (
+                              <Check size={18} />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
                           </button>
                         </>
-                      )}
-                      {l.published && (
-                        <ChevronRight size={20} className="text-zinc-300" />
                       )}
                     </div>
                   </div>
@@ -738,15 +764,16 @@ function CourseContent() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isTeacher && (
-                        <>
+                    {isTeacher && (
+                      <>
+                        <div className="grid gap-2">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               handleToggleQuizPublish(q);
                             }}
-                            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
+                            className={`group rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
                               q.published
                                 ? "bg-green-100 text-green-700 hover:bg-green-200"
                                 : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
@@ -758,34 +785,41 @@ function CourseContent() {
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleDeleteQuiz(q);
+                              handleEditQuiz(q);
                             }}
-                            disabled={deletingQuizId === q.id}
-                            title={
-                              pendingDeleteQuiz === q.id
-                                ? "Click again to confirm deletion"
-                                : "Delete quiz"
-                            }
-                            className={`rounded-lg p-2 transition disabled:opacity-50 ${
-                              pendingDeleteQuiz === q.id
-                                ? "bg-red-100 text-red-600"
-                                : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
-                            }`}
+                            className="group rounded-lg px-3 py-1 text-xs font-bold uppercase transition bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
                           >
-                            <Trash2 size={18} />
+                            Edit
                           </button>
-                        </>
-                      )}
-                      {/* Show Student Score */}
-                      {grades.find((g) => g.quizId === q.id) && (
-                        <p className="text-xs text-zinc-500">
-                          {grades.find((g) => g.quizId === q.id)?.score}%
-                        </p>
-                      )}
-                      {q.published && (
-                        <ChevronRight size={20} className="text-zinc-300" />
-                      )}
-                    </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteQuiz(q);
+                          }}
+                          disabled={deletingQuizId === q.id}
+                          className={`rounded-lg p-2 transition disabled:opacity-50 ${
+                            pendingDeleteQuiz === q.id
+                              ? "bg-red-100 text-red-600"
+                              : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
+                          }`}
+                        >
+                          {pendingDeleteQuiz === q.id ? (
+                            <Check size={18} />
+                          ) : (
+                            <Trash2 size={18} />
+                          )}
+                        </button>
+                      </>
+                    )}
+                    {/* Show Student Score */}
+                    {grades.find((g) => g.quizId === q.id) && (
+                      <p className="text-xs text-zinc-500">
+                        {grades.find((g) => g.quizId === q.id)?.score}%
+                      </p>
+                    )}
+                  </div>
                   </div>
                 );
 

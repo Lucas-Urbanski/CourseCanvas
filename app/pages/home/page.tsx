@@ -17,8 +17,18 @@ type Course = {
   instructor: string;
   instructorId: string;
   startDate: string;
-  endDate?: string;
+  endDate: string;
   isCompleted?: boolean;
+};
+
+// Helper: returns true if a course's end date is strictly in the past
+const isCourseEnded = (endDate: string): boolean => {
+  if (!endDate) return false;
+  const ended = new Date(endDate);
+  ended.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return ended < today;
 };
 
 function HomeContent() {
@@ -49,46 +59,45 @@ function HomeContent() {
 
   // Completion Logic: A course is complete if the student has a grade for every published quiz in that course.
   const computeCompletedIds = useCallback(
-    async (
-      _rawCourses: any[],
-      courseIdsToCheck: string[],
-    ): Promise<Set<string>> => {
-      if (courseIdsToCheck.length === 0) return new Set();
+    async function (_rawCourses: any[],
+    courseIdsToCheck: string[]): Promise<Set<string>> {
+    if (courseIdsToCheck.length === 0) return new Set();
 
-      // Parallel fetch for published quizzes and student grades across multiple courses
-      const [{ data: quizData }, { data: gradeData }] = await Promise.all([
-        supabase
-          .from("quizzes")
-          .select("id, courseId")
-          .eq("published", true)
-          .in("courseId", courseIdsToCheck),
-        supabase
-          .from("grades")
-          .select("quizId")
-          .eq("studentId", user!.id)
-          .in("courseId", courseIdsToCheck),
-      ]);
+    // Parallel fetch for published quizzes and student grades across multiple courses
+    const [{ data: quizData }, { data: gradeData }] = await Promise.all([
+      supabase
+        .from("quizzes")
+        .select("id, courseId")
+        .eq("published", true)
+        .in("courseId", courseIdsToCheck),
+      supabase
+        .from("grades")
+        .select("quizId")
+        .eq("studentId", user!.id)
+        .in("courseId", courseIdsToCheck),
+    ]);
 
-      const gradedQuizIds = new Set(
-        (gradeData ?? []).map((g: any) => g.quizId),
-      );
+    const gradedQuizIds = new Set(
+      (gradeData ?? []).map((g: any) => g.quizId)
+    );
 
-      return new Set(
-        courseIdsToCheck.filter((courseId) => {
-          const quizIds = (quizData ?? [])
-            .filter((q: any) => q.courseId === courseId)
-            .map((q: any) => q.id);
-          // Return true only if quizzes exist and every quiz ID is found in the student's grades
-          return (
-            quizIds.length > 0 &&
-            quizIds.every((id: string) => gradedQuizIds.has(id))
-          );
-        }),
-      );
-    },
+    return new Set(
+      courseIdsToCheck.filter((courseId) => {
+        const quizIds = (quizData ?? [])
+          .filter((q: any) => q.courseId === courseId)
+          .map((q: any) => q.id);
+        // Return true only if quizzes exist and every quiz ID is found in the student's grades and has a passing grade.
+        return (
+          quizIds.length > 0 &&
+          quizIds.every((id: string) => gradedQuizIds.has(id)) &&
+          gradedQuizIds.forEach(grade => grade >= 50)
+        );
+      })
+    );
+  },
     [supabase, user],
   );
-  
+
   // Fetches the main course list and student-specific enrollment/completion status
   const fetchCourses = useCallback(async () => {
     if (!user?.id) return;
@@ -125,7 +134,7 @@ function HomeContent() {
             if (!c.endDate) return false;
             const ended = new Date(c.endDate);
             ended.setHours(0, 0, 0, 0);
-            return ended <= today;
+            return ended < today;
           })
           .map((c: any) => c.id);
 
@@ -222,7 +231,7 @@ function HomeContent() {
           if (!c.endDate) return false;
           const ended = new Date(c.endDate);
           ended.setHours(0, 0, 0, 0);
-          return ended <= today;
+          return ended < today;
         })
         .map((c) => c.id);
       const completedIds = await computeCompletedIds(courses, allPastCourseIds);
@@ -296,7 +305,7 @@ function HomeContent() {
       c.category.toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Split filtered courses into categories based on user role and status
+  // Split filtered courses into categories based on user role and status.
   const myCourses = isTeacher
     ? filteredCourses.filter((c) => c.instructorId === user?.id)
     : [];
@@ -309,12 +318,18 @@ function HomeContent() {
     : [];
   const enrolledCourses = !isTeacher
     ? filteredCourses.filter(
-        (c) => enrolledCourseIds.has(c.id) && !c.isCompleted,
+        (c) =>
+          enrolledCourseIds.has(c.id) &&
+          !c.isCompleted &&
+          !isCourseEnded(c.endDate),
       )
     : [];
   const browseCourses = !isTeacher
     ? filteredCourses.filter(
-        (c) => !enrolledCourseIds.has(c.id) && !c.isCompleted,
+        (c) =>
+          !enrolledCourseIds.has(c.id) &&
+          !c.isCompleted &&
+          !isCourseEnded(c.endDate),
       )
     : [];
 
@@ -516,7 +531,6 @@ function HomeContent() {
   );
 }
 
-// Wrapper component to ensure authentication before rendering HomeContent
 export default function Home() {
   return (
     <AuthGuard>

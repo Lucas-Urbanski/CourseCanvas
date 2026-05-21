@@ -20,7 +20,7 @@ type Course = {
   category: string;
   instructor: string;
   startDate: string;
-  endDate?: string;
+  endDate: string;
   isCompleted?: boolean;
 };
 
@@ -44,13 +44,13 @@ function CertificateModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       // Close if clicking outside the certificate
-      onClick={onClose} 
+      onClick={onClose}
     >
       {/* Modal Container */}
       <div
         className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
         // Prevent closing when clicking inside the certificate
-        onClick={(e) => e.stopPropagation()} 
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Gold Header */}
         <div className="bg-gradient-to-r from-amber-500 to-yellow-400 px-8 py-6 text-center">
@@ -127,7 +127,7 @@ export default function CourseCard({
   onUnenroll,
   onDelete,
 }: CourseCardProps) {
-  // Track which course is currently in the "Confirm?" state for deletion/unenrollment
+  // Track which course is currently in the "Confirm?" state for deletion/enrollment
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   // Track which course certificate is currently being displayed in the modal
   const [certCourse, setCertCourse] = useState<Course | null>(null);
@@ -176,7 +176,7 @@ export default function CourseCard({
         {courses.map((course) => {
           const isConfirming = pendingAction === course.id;
 
-          // reusable card UI snippet 
+          // reusable card UI snippet
           const card = (
             <div
               className={`relative flex h-full flex-col justify-between overflow-hidden rounded-3xl border bg-white p-7 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${
@@ -294,11 +294,18 @@ export default function CourseCard({
                     <User size={16} className="text-zinc-400" />
                     <span className="font-medium">{course.instructor}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-zinc-500">
-                    <Calendar size={16} className="text-zinc-400" />
-                    <span>
-                      Starts{" "}
+                  <div className="flex flex-col gap-2 text-sm text-zinc-500">
+                    <span className="flex flex-row items-center gap-1">
+                      <Calendar size={16} className="text-zinc-400" /> {" "} Starts{" "}
                       {new Date(course.startDate).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <span className="flex flex-row items-center gap-1">
+                      <Calendar size={16} className="text-zinc-400" /> {" "} Ends{" "}
+                      {new Date(course.endDate).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
@@ -310,10 +317,6 @@ export default function CourseCard({
             </div>
           );
 
-          /* Return Logic: 
-            If completed, clicking the card opens the certificate modal.
-            If not completed, clicking the card navigates to the course details page.
-          */
           return course.isCompleted ? (
             <div
               key={course.id}
