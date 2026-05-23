@@ -85,7 +85,8 @@ function CourseContent() {
   const [course, setCourse] = useState<Course | null>(null);
 
   // Boolean check to determine if the logged-in user is the teacher of this course
-  const isTeacher = course?.instructorId === user?.id;
+  const isTeacher =
+    course?.instructorId === user?.id && user?.role === "instructor";
 
   // Ref for the hidden file input used in lesson uploads
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -454,9 +455,9 @@ function CourseContent() {
     }
   };
 
-  const handleEditQuiz = (quiz : Quiz) => {
-    window.location.href =(`/pages/quizCreation?courseId=${uuid}&quizId=${quiz.id}`);
-  }
+  const handleEditQuiz = (quiz: Quiz) => {
+    window.location.href = `/pages/quizCreation?courseId=${uuid}&quizId=${quiz.id}`;
+  };
 
   // UI Rendering Logic
 
@@ -805,63 +806,63 @@ function CourseContent() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                    {isTeacher && (
-                      <>
-                        <div className="grid gap-2">
+                      {isTeacher && (
+                        <>
+                          <div className="grid gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleToggleQuizPublish(q);
+                              }}
+                              className={`group rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
+                                q.published
+                                  ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                  : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                              }`}
+                            >
+                              {q.published ? "Unpublish" : "Publish"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleEditQuiz(q);
+                              }}
+                              className="group rounded-lg px-3 py-1 text-xs font-bold uppercase transition bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                            >
+                              Edit
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
-                              handleToggleQuizPublish(q);
+                              handleDeleteQuiz(q);
                             }}
-                            className={`group rounded-lg px-3 py-1 text-xs font-bold uppercase transition ${
-                              q.published
-                                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                            disabled={deletingQuizId === q.id}
+                            className={`rounded-lg p-2 transition disabled:opacity-50 ${
+                              pendingDeleteQuiz === q.id
+                                ? "bg-red-100 text-red-600"
+                                : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
                             }`}
                           >
-                            {q.published ? "Unpublish" : "Publish"}
+                            {pendingDeleteQuiz === q.id ? (
+                              <Check size={18} />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleEditQuiz(q);
-                            }}
-                            className="group rounded-lg px-3 py-1 text-xs font-bold uppercase transition bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDeleteQuiz(q);
-                          }}
-                          disabled={deletingQuizId === q.id}
-                          className={`rounded-lg p-2 transition disabled:opacity-50 ${
-                            pendingDeleteQuiz === q.id
-                              ? "bg-red-100 text-red-600"
-                              : "text-zinc-400 hover:bg-red-50 hover:text-red-600"
-                          }`}
-                        >
-                          {pendingDeleteQuiz === q.id ? (
-                            <Check size={18} />
-                          ) : (
-                            <Trash2 size={18} />
-                          )}
-                        </button>
-                      </>
-                    )}
-                    {/* Show Student Score */}
-                    {grades.find((g) => g.quizId === q.id) && (
-                      <p className="text-xs text-zinc-500">
-                        {grades.find((g) => g.quizId === q.id)?.score}%
-                      </p>
-                    )}
-                  </div>
+                        </>
+                      )}
+                      {/* Show Student Score */}
+                      {!isTeacher && grades.find((g) => g.quizId === q.id) && (
+                        <p className="text-xs text-zinc-500">
+                          {grades.find((g) => g.quizId === q.id)?.score}%
+                        </p>
+                      )}
+                    </div>
                   </div>
                 );
 
