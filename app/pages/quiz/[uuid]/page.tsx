@@ -239,10 +239,10 @@ function QuizContent() {
           </p>
           <button
             type="button"
-            onClick={() => router.push("/pages/home")}
+            onClick={() => router.back()}
             className="mt-6 rounded-2xl bg-zinc-900 px-6 py-3 font-bold text-[#F5F1E6] transition hover:bg-black"
           >
-            Back to Home
+            Back to Course
           </button>
         </div>
       </main>
