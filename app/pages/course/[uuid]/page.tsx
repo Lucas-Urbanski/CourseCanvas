@@ -105,6 +105,11 @@ function CourseContent() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
 
+  const isEnrolled = useMemo(() => {
+    if (!course || !user) return false;
+    return students.some((s) => s.id === user.id);
+  }, [course, user, students]);
+
   // Action states for loading indicators and error handling
   const [uploading, setUploading] = useState(false);
   const [deletingLessonId, setDeletingLessonId] = useState<string | null>(null);
@@ -868,12 +873,17 @@ function CourseContent() {
 
                 return (
                   <div key={q.id} className="group">
-                    {q.published && !isTeacher ? (
+                    {q.published && !isTeacher && isEnrolled ? (
                       <Link href={`/pages/quiz/${q.id}`} className="block">
                         {card}
                       </Link>
                     ) : (
-                      <div className="block">{card}</div>
+                      <div className="block cursor-not-allowed opacity-70">
+                        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 mb-2 text-sm text-red-800">
+                          You must be enrolled in this course to take quizzes.
+                        </div>
+                        {card}
+                      </div>
                     )}
                   </div>
                 );
