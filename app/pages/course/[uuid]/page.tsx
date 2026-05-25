@@ -878,10 +878,12 @@ function CourseContent() {
                         {card}
                       </Link>
                     ) : (
-                      <div className="block cursor-not-allowed opacity-70">
-                        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 mb-2 text-sm text-red-800">
-                          You must be enrolled in this course to take quizzes.
-                        </div>
+                      <div className="block">
+                        {!isTeacher && (
+                          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 mb-2 text-sm text-red-800">
+                            You must be enrolled in this course to take quizzes.
+                          </div>
+                        )}
                         {card}
                       </div>
                     )}
