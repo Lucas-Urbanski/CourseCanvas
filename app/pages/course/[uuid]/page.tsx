@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
@@ -879,12 +880,20 @@ function CourseContent() {
                       </Link>
                     ) : (
                       <div className="block">
-                        {!isTeacher && (
+                        {!isTeacher ? (
                           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 mb-2 text-sm text-red-800">
                             You must be enrolled in this course to take quizzes.
                           </div>
+                        ) : isTeacher ? (
+                          <Link
+                            href={`/pages/quizGrades/${q.id}`}
+                            className="block"
+                          >
+                            {card}
+                          </Link>
+                        ) : (
+                          <div className="block">{card}</div>
                         )}
-                        {card}
                       </div>
                     )}
                   </div>
