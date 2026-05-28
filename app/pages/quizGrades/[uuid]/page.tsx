@@ -1,4 +1,5 @@
 "use client";
+
 import AuthGuard from "@/app/components/AuthGuard";
 import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
@@ -36,9 +37,11 @@ function getBarColor(grade: number) {
 }
 
 function QuizGradesContent() {
+  // Extract the quiz UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
 
+  // Initialize Supabase client using useMemo to prevent reinitialization on every render
   const supabase = useMemo(
     () =>
       createBrowserClient(
@@ -50,7 +53,6 @@ function QuizGradesContent() {
 
   const [grades, setGrades] = useState<StudentGrade[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-
   useEffect(() => {
     if (!uuid) return;
 
