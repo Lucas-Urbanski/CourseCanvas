@@ -73,13 +73,13 @@ function HomeContent() {
         .in("courseId", courseIdsToCheck),
       supabase
         .from("grades")
-        .select("quizId")
+        .select("quizId, score")
         .eq("studentId", user!.id)
         .in("courseId", courseIdsToCheck),
     ]);
 
-    const gradedQuizIds = new Set(
-      (gradeData ?? []).map((g: any) => g.quizId)
+    const gradedQuizScores = new Map<string, number>(
+      (gradeData ?? []).map((g: any) => [g.quizId, g.score])
     );
 
     return new Set(
@@ -90,8 +90,8 @@ function HomeContent() {
         // Return true only if quizzes exist and every quiz ID is found in the student's grades and has a passing grade.
         return (
           quizIds.length > 0 &&
-          quizIds.every((id: string) => gradedQuizIds.has(id)) &&
-          gradedQuizIds.forEach(grade => grade >= 50)
+          quizIds.every((id: string) => gradedQuizScores.has(id)) &&
+          quizIds.every((id: string) => (gradedQuizScores.get(id) ?? 0) >= 50)
         );
       })
     );
