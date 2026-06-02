@@ -25,6 +25,13 @@ import { useAuth } from "../../../context/AuthContext";
 import AuthGuard from "../../../components/AuthGuard";
 
 // Type Definitions for Type Safety
+type Profile = {
+  id: string;
+  fullName?: string;
+  bio?: string;
+  avatarUrl?: string;
+};
+
 type Course = {
   id: string;
   name: string;
@@ -46,6 +53,7 @@ type Quiz = {
 type Student = {
   id: string;
   fullName: string;
+  bio: string;
 };
 
 type Lesson = {
@@ -64,7 +72,7 @@ type Grade = {
   score: number;
 };
 
-function CourseContent() {
+function CourseContent({ onClose }: { onClose?: () => void }) {
   // Extract the course UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
@@ -101,6 +109,7 @@ function CourseContent() {
   > | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -141,47 +150,60 @@ function CourseContent() {
       setLoading(true);
       try {
         // Fetch Course, Quizzes, Enrollments, Lessons, and Grades concurrently for performance
-        const [courseRes, quizRes, enrollmentRes, lessonsRes, gradeRes] =
-          await Promise.all([
-            // Get course info and join with profiles table for instructor name
-            supabase
-              .from("courses")
-              .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
-              )
-              .eq("id", uuid)
-              .single(),
+        const [
+          profileRes,
+          courseRes,
+          quizRes,
+          enrollmentRes,
+          lessonsRes,
+          gradeRes,
+        ] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select(`id, "fullName", "bio", "avatarUrl"`)
+            .eq("id", user?.id)
+            .single(),
 
-            // Get all quizzes for this course
-            supabase
-              .from("quizzes")
-              .select(`id, title, timeLimit, "dueDate", published`)
-              .eq("courseId", uuid),
+          // Get course info and join with profiles table for instructor name
+          supabase
+            .from("courses")
+            .select(
+              `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", "bio")`,
+            )
+            .eq("id", uuid)
+            .single(),
 
-            // Get enrolled students
-            supabase
-              .from("enrollments")
-              .select(`student:studentId (id, "fullName")`)
-              .eq("courseId", uuid),
+          // Get all quizzes for this course
+          supabase
+            .from("quizzes")
+            .select(`id, title, timeLimit, "dueDate", published`)
+            .eq("courseId", uuid),
 
-            // Get lessons ordered by most recent
-            supabase
-              .from("lessons")
-              .select(
-                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
-              )
-              .eq("courseId", uuid)
-              .order("uploadedAt", { ascending: false }),
+          // Get enrolled students
+          supabase
+            .from("enrollments")
+            .select(`student:studentId (id, "fullName", "bio")`)
+            .eq("courseId", uuid),
 
-            // Get grades only for the current user
-            supabase
-              .from("grades")
-              .select(`score, "studentId", "quizId", "courseId"`)
-              .eq("courseId", uuid)
-              .eq("studentId", user?.id),
-          ]);
+          // Get lessons ordered by most recent
+          supabase
+            .from("lessons")
+            .select(
+              `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
+            )
+            .eq("courseId", uuid)
+            .order("uploadedAt", { ascending: false }),
+
+          // Get grades only for the current user
+          supabase
+            .from("grades")
+            .select(`score, "studentId", "quizId", "courseId"`)
+            .eq("courseId", uuid)
+            .eq("studentId", user?.id),
+        ]);
 
         // Error handling for all requests
+        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
@@ -189,7 +211,15 @@ function CourseContent() {
         if (gradeRes.error) throw gradeRes.error;
 
         // Map raw database data to our defined types
+
         const raw = courseRes.data as any;
+        setProfile({
+          id: raw.id,
+          fullName: raw.profiles?.fullName,
+          bio: raw.profiles?.bio,
+          avatarUrl: raw.profiles?.avatarUrl,
+        });
+
         setCourse({
           id: raw.id,
           name: raw.title,
@@ -560,14 +590,21 @@ function CourseContent() {
               <div className="rounded-xl bg-white/10 p-2">
                 <UserCircle size={24} />
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase opacity-50">
+              <div className="flex flex-col">
+                <p className=" text-[10px] font-bold uppercase opacity-50">
                   Instructor
                 </p>
                 <p className="text-sm font-semibold">{course.instructor}</p>
               </div>
+              {profile?.bio && (
+                <div className="flex flex-col gap-1">
+                  <p className=" text-[10px] font-bold uppercase opacity-50">
+                    Bio
+                  </p>
+                  <p className="text-xs opacity-80"> {profile.bio}</p>
+                </div>
+              )}
             </div>
-
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="rounded-xl bg-white/10 p-2">
                 <CalendarDays size={24} />
@@ -627,7 +664,12 @@ function CourseContent() {
                         .map((n) => n[0])
                         .join("")}
                     </div>
-                    {s.fullName}
+                    <div>
+                      <p>{s.fullName}</p>
+                      {s.bio && (
+                        <p className="text-xs text-zinc-500">{s.bio}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
