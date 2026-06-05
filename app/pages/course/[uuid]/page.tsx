@@ -54,6 +54,7 @@ type Student = {
   id: string;
   fullName: string;
   avatarUrl?: string | null;
+  bio: string;
 };
 
 type Lesson = {
@@ -156,7 +157,7 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
             supabase
               .from("courses")
               .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", "avatarUrl")`,
+                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
               )
               .eq("id", uuid)
               .single(),
@@ -170,7 +171,7 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
             // Get enrolled students
             supabase
               .from("enrollments")
-              .select(`student:studentId (id, "fullName", "avatarUrl")`)
+              .select(`student:studentId (id, "fullName")`)
               .eq("courseId", uuid),
 
             // Get lessons ordered by most recent
@@ -191,7 +192,6 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
           ]);
 
         // Error handling for all requests
-        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
