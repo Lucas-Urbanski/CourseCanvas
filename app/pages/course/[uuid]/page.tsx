@@ -162,11 +162,11 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
               .eq("id", uuid)
               .single(),
 
-          // Get all quizzes for this course
-          supabase
-            .from("quizzes")
-            .select(`id, title, timeLimit, "dueDate", published`)
-            .eq("courseId", uuid),
+            // Get all quizzes for this course
+            supabase
+              .from("quizzes")
+              .select(`id, title, timeLimit, "dueDate", published`)
+              .eq("courseId", uuid),
 
             // Get enrolled students
             supabase
@@ -174,22 +174,22 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
               .select(`student:studentId (id, "fullName")`)
               .eq("courseId", uuid),
 
-          // Get lessons ordered by most recent
-          supabase
-            .from("lessons")
-            .select(
-              `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
-            )
-            .eq("courseId", uuid)
-            .order("uploadedAt", { ascending: false }),
+            // Get lessons ordered by most recent
+            supabase
+              .from("lessons")
+              .select(
+                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
+              )
+              .eq("courseId", uuid)
+              .order("uploadedAt", { ascending: false }),
 
-          // Get grades only for the current user
-          supabase
-            .from("grades")
-            .select(`score, "studentId", "quizId", "courseId"`)
-            .eq("courseId", uuid)
-            .eq("studentId", user?.id),
-        ]);
+            // Get grades only for the current user
+            supabase
+              .from("grades")
+              .select(`score, "studentId", "quizId", "courseId"`)
+              .eq("courseId", uuid)
+              .eq("studentId", user?.id),
+          ]);
 
         // Error handling for all requests
         if (profileRes.error) throw profileRes.error;
@@ -577,9 +577,17 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-xl bg-white/10 p-2">
-                <UserCircle size={24} />
-              </div>
+              {course.instructorAvatarUrl ? (
+                <img
+                  src={course.instructorAvatarUrl}
+                  alt={`${course.instructor} avatar`}
+                  className="h-10 w-10 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="rounded-xl bg-white/10 p-2">
+                  <UserCircle size={24} />
+                </div>
+              )}
               <div>
                 <p className="text-[10px] font-bold uppercase opacity-50">
                   Instructor
@@ -648,12 +656,20 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
                     key={s.id}
                     className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
-                      {s.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </div>
+                    {s.avatarUrl ? (
+                      <img
+                        src={s.avatarUrl}
+                        alt={`${s.fullName} avatar`}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                        {s.fullName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </div>
+                    )}
                     {s.fullName}
                   </div>
                 ))}
