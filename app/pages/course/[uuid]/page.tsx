@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
@@ -25,6 +24,13 @@ import { useAuth } from "../../../context/AuthContext";
 import AuthGuard from "../../../components/AuthGuard";
 
 // Type Definitions for Type Safety
+type Profile = {
+  id: string;
+  fullName?: string;
+  bio?: string;
+  avatarUrl?: string;
+};
+
 type Course = {
   id: string;
   name: string;
@@ -48,6 +54,7 @@ type Student = {
   id: string;
   fullName: string;
   avatarUrl?: string | null;
+  bio: string;
 };
 
 type Lesson = {
@@ -66,7 +73,7 @@ type Grade = {
   score: number;
 };
 
-function CourseContent() {
+function CourseContent({ onClose }: { onClose?: () => void }) {
   // Extract the course UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
@@ -103,6 +110,7 @@ function CourseContent() {
   > | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -149,41 +157,42 @@ function CourseContent() {
             supabase
               .from("courses")
               .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", "avatarUrl")`,
+                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
               )
               .eq("id", uuid)
               .single(),
 
-            // Get all quizzes for this course
-            supabase
-              .from("quizzes")
-              .select(`id, title, timeLimit, "dueDate", published`)
-              .eq("courseId", uuid),
+          // Get all quizzes for this course
+          supabase
+            .from("quizzes")
+            .select(`id, title, timeLimit, "dueDate", published`)
+            .eq("courseId", uuid),
 
             // Get enrolled students
             supabase
               .from("enrollments")
-              .select(`student:studentId (id, "fullName", "avatarUrl")`)
+              .select(`student:studentId (id, "fullName")`)
               .eq("courseId", uuid),
 
-            // Get lessons ordered by most recent
-            supabase
-              .from("lessons")
-              .select(
-                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
-              )
-              .eq("courseId", uuid)
-              .order("uploadedAt", { ascending: false }),
+          // Get lessons ordered by most recent
+          supabase
+            .from("lessons")
+            .select(
+              `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
+            )
+            .eq("courseId", uuid)
+            .order("uploadedAt", { ascending: false }),
 
-            // Get grades only for the current user
-            supabase
-              .from("grades")
-              .select(`score, "studentId", "quizId", "courseId"`)
-              .eq("courseId", uuid)
-              .eq("studentId", user?.id),
-          ]);
+          // Get grades only for the current user
+          supabase
+            .from("grades")
+            .select(`score, "studentId", "quizId", "courseId"`)
+            .eq("courseId", uuid)
+            .eq("studentId", user?.id),
+        ]);
 
         // Error handling for all requests
+        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
@@ -191,7 +200,15 @@ function CourseContent() {
         if (gradeRes.error) throw gradeRes.error;
 
         // Map raw database data to our defined types
+
         const raw = courseRes.data as any;
+        setProfile({
+          id: raw.id,
+          fullName: raw.profiles?.fullName,
+          bio: raw.profiles?.bio,
+          avatarUrl: raw.profiles?.avatarUrl,
+        });
+
         setCourse({
           id: raw.id,
           name: raw.title,
@@ -560,25 +577,24 @@ function CourseContent() {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              {course.instructorAvatarUrl ? (
-                <img
-                  src={course.instructorAvatarUrl}
-                  alt={`${course.instructor} avatar`}
-                  className="h-10 w-10 rounded-xl object-cover"
-                />
-              ) : (
-                <div className="rounded-xl bg-white/10 p-2">
-                  <UserCircle size={24} />
-                </div>
-              )}
+              <div className="rounded-xl bg-white/10 p-2">
+                <UserCircle size={24} />
+              </div>
               <div>
                 <p className="text-[10px] font-bold uppercase opacity-50">
                   Instructor
                 </p>
                 <p className="text-sm font-semibold">{course.instructor}</p>
               </div>
+              {profile?.bio && (
+                <div className="flex flex-col gap-1">
+                  <p className=" text-[10px] font-bold uppercase opacity-50">
+                    Bio
+                  </p>
+                  <p className="text-xs opacity-80"> {profile.bio}</p>
+                </div>
+              )}
             </div>
-
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="rounded-xl bg-white/10 p-2">
                 <CalendarDays size={24} />
@@ -632,20 +648,12 @@ function CourseContent() {
                     key={s.id}
                     className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
                   >
-                    {s.avatarUrl ? (
-                      <img
-                        src={s.avatarUrl}
-                        alt={`${s.fullName} avatar`}
-                        className="h-8 w-8 shrink-0 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
-                        {s.fullName
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </div>
-                    )}
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                      {s.fullName
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")}
+                    </div>
                     {s.fullName}
                   </div>
                 ))}
