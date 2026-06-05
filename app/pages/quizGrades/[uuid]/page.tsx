@@ -15,6 +15,7 @@ type StudentGrade = {
 type Student = {
   id: string;
   fullName: string;
+  avatarUrl?: string | null;
 };
 
 function getInitials(name: string) {
@@ -70,7 +71,7 @@ function QuizGradesContent() {
           supabase.from("grades").select(`score, studentId`).eq("quizId", uuid),
           supabase
             .from("enrollments")
-            .select(`student:studentId (id, "fullName")`)
+            .select(`student:studentId (id, "fullName", "avatarUrl")`)
             .eq("courseId", courseId),
         ]);
         if (studentGradeRes.error) throw studentGradeRes.error;

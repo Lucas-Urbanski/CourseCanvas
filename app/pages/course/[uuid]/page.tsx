@@ -31,6 +31,7 @@ type Course = {
   description: string;
   instructorId: string;
   instructor: string;
+  instructorAvatarUrl?: string | null;
   startDate: string;
   endDate: string;
 };
@@ -46,6 +47,7 @@ type Quiz = {
 type Student = {
   id: string;
   fullName: string;
+  avatarUrl?: string | null;
 };
 
 type Lesson = {
@@ -147,7 +149,7 @@ function CourseContent() {
             supabase
               .from("courses")
               .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
+                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", "avatarUrl")`,
               )
               .eq("id", uuid)
               .single(),
@@ -161,7 +163,7 @@ function CourseContent() {
             // Get enrolled students
             supabase
               .from("enrollments")
-              .select(`student:studentId (id, "fullName")`)
+              .select(`student:studentId (id, "fullName", "avatarUrl")`)
               .eq("courseId", uuid),
 
             // Get lessons ordered by most recent
@@ -196,6 +198,7 @@ function CourseContent() {
           description: raw.description ?? "",
           instructorId: raw.instructorId ?? "",
           instructor: raw.profiles?.fullName ?? "Unknown Instructor",
+          instructorAvatarUrl: raw.profiles?.avatarUrl ?? null,
           startDate: raw.startDate ?? "",
           endDate: raw.endDate ?? "",
         });
@@ -557,9 +560,17 @@ function CourseContent() {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-xl bg-white/10 p-2">
-                <UserCircle size={24} />
-              </div>
+              {course.instructorAvatarUrl ? (
+                <img
+                  src={course.instructorAvatarUrl}
+                  alt={`${course.instructor} avatar`}
+                  className="h-10 w-10 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="rounded-xl bg-white/10 p-2">
+                  <UserCircle size={24} />
+                </div>
+              )}
               <div>
                 <p className="text-[10px] font-bold uppercase opacity-50">
                   Instructor
@@ -621,12 +632,20 @@ function CourseContent() {
                     key={s.id}
                     className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
-                      {s.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </div>
+                    {s.avatarUrl ? (
+                      <img
+                        src={s.avatarUrl}
+                        alt={`${s.fullName} avatar`}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                        {s.fullName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </div>
+                    )}
                     {s.fullName}
                   </div>
                 ))}
