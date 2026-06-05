@@ -26,9 +26,9 @@ import AuthGuard from "../../../components/AuthGuard";
 // Type Definitions for Type Safety
 type Profile = {
   id: string;
-  fullName?: string;
-  bio?: string;
-  avatarUrl?: string;
+  fullName?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
 };
 
 type Course = {
@@ -54,7 +54,7 @@ type Student = {
   id: string;
   fullName: string;
   avatarUrl?: string | null;
-  bio: string;
+  bio: string | null;
 };
 
 type Lesson = {
@@ -157,7 +157,7 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
             supabase
               .from("courses")
               .select(
-                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName")`,
+                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", bio, "avatarUrl")`,
               )
               .eq("id", uuid)
               .single(),
@@ -171,7 +171,7 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
             // Get enrolled students
             supabase
               .from("enrollments")
-              .select(`student:studentId (id, "fullName")`)
+              .select(`student:studentId (id, "fullName", bio, "avatarUrl")`)
               .eq("courseId", uuid),
 
             // Get lessons ordered by most recent
@@ -202,10 +202,10 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
 
         const raw = courseRes.data as any;
         setProfile({
-          id: raw.id,
-          fullName: raw.profiles?.fullName,
-          bio: raw.profiles?.bio,
-          avatarUrl: raw.profiles?.avatarUrl,
+          id: raw.instructorId,
+          fullName: raw.profiles?.fullName ?? null,
+          bio: raw.profiles?.bio ?? null,
+          avatarUrl: raw.profiles?.avatarUrl ?? null,
         });
 
         setCourse({
@@ -232,7 +232,13 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
         setStudents(
           (enrollmentRes.data ?? [])
             .map((e: any) => e.student as Student | null)
-            .filter((s): s is Student => s !== null),
+            .filter((s): s is Student => s !== null)
+            .map((s) => ({
+              id: String(s.id),
+              fullName: s.fullName,
+              avatarUrl: s.avatarUrl ?? null,
+              bio: s.bio ?? null,
+            })),
         );
 
         setLessons(
