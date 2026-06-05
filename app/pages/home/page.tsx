@@ -16,6 +16,7 @@ type Course = {
   category: string;
   instructor: string;
   instructorId: string;
+  instructorAvatarUrl?: string | null;
   startDate: string;
   endDate: string;
   isCompleted?: boolean;
@@ -109,9 +110,9 @@ function HomeContent() {
       const { data, error } = await supabase
         .from("courses")
         .select(
-          `id, title, description, category, "instructorId", "startDate", "endDate", profiles:instructorId ("fullName")`,
+          `id, title, description, category, "instructorId", "startDate", "endDate", profiles:instructorId ("fullName", "avatarUrl", "avatarUrl")`,
         )
-        .order('"createdAt"', { ascending: false });
+        .order("createdAt", { ascending: false })
 
       if (error) throw error;
 
@@ -167,6 +168,7 @@ function HomeContent() {
           category: c.category ?? "",
           instructor: c.profiles?.fullName ?? "Unknown",
           instructorId: c.instructorId ?? "",
+          instructorAvatarUrl: c.profiles?.avatarUrl ?? null,
           startDate: c.startDate ?? "",
           endDate: c.endDate ?? "",
           isCompleted: completedIds.has(c.id),
@@ -185,6 +187,7 @@ function HomeContent() {
             category: c.category ?? "",
             instructor: c.profiles?.fullName ?? "Unknown",
             instructorId: c.instructorId ?? "",
+            instructorAvatarUrl: c.profiles?.avatarUrl ?? null,
             startDate: c.startDate ?? "",
             endDate: c.endDate ?? "",
           })),
