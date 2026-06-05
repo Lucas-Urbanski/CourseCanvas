@@ -192,7 +192,6 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
           ]);
 
         // Error handling for all requests
-        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
