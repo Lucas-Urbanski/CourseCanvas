@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
@@ -25,6 +24,13 @@ import { useAuth } from "../../../context/AuthContext";
 import AuthGuard from "../../../components/AuthGuard";
 
 // Type Definitions for Type Safety
+type Profile = {
+  id: string;
+  fullName?: string;
+  bio?: string;
+  avatarUrl?: string;
+};
+
 type Course = {
   id: string;
   name: string;
@@ -66,7 +72,7 @@ type Grade = {
   score: number;
 };
 
-function CourseContent() {
+function CourseContent({ onClose }: { onClose?: () => void }) {
   // Extract the course UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
@@ -103,6 +109,7 @@ function CourseContent() {
   > | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -184,6 +191,7 @@ function CourseContent() {
           ]);
 
         // Error handling for all requests
+        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
@@ -191,7 +199,15 @@ function CourseContent() {
         if (gradeRes.error) throw gradeRes.error;
 
         // Map raw database data to our defined types
+
         const raw = courseRes.data as any;
+        setProfile({
+          id: raw.id,
+          fullName: raw.profiles?.fullName,
+          bio: raw.profiles?.bio,
+          avatarUrl: raw.profiles?.avatarUrl,
+        });
+
         setCourse({
           id: raw.id,
           name: raw.title,
@@ -577,8 +593,15 @@ function CourseContent() {
                 </p>
                 <p className="text-sm font-semibold">{course.instructor}</p>
               </div>
+              {profile?.bio && (
+                <div className="flex flex-col gap-1">
+                  <p className=" text-[10px] font-bold uppercase opacity-50">
+                    Bio
+                  </p>
+                  <p className="text-xs opacity-80"> {profile.bio}</p>
+                </div>
+              )}
             </div>
-
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="rounded-xl bg-white/10 p-2">
                 <CalendarDays size={24} />
