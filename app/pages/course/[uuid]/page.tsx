@@ -26,9 +26,9 @@ import AuthGuard from "../../../components/AuthGuard";
 // Type Definitions for Type Safety
 type Profile = {
   id: string;
-  fullName?: string;
-  bio?: string;
-  avatarUrl?: string;
+  fullName?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
 };
 
 type Course = {
@@ -37,6 +37,7 @@ type Course = {
   description: string;
   instructorId: string;
   instructor: string;
+  instructorAvatarUrl?: string | null;
   startDate: string;
   endDate: string;
 };
@@ -52,7 +53,8 @@ type Quiz = {
 type Student = {
   id: string;
   fullName: string;
-  bio: string;
+  avatarUrl?: string | null;
+  bio: string | null;
 };
 
 type Lesson = {
@@ -149,60 +151,47 @@ function CourseContent({ }: { onClose?: () => void }) {
       setLoading(true);
       try {
         // Fetch Course, Quizzes, Enrollments, Lessons, and Grades concurrently for performance
-        const [
-          profileRes,
-          courseRes,
-          quizRes,
-          enrollmentRes,
-          lessonsRes,
-          gradeRes,
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select(`id, "fullName", "bio", "avatarUrl"`)
-            .eq("id", user?.id)
-            .single(),
+        const [courseRes, quizRes, enrollmentRes, lessonsRes, gradeRes] =
+          await Promise.all([
+            // Get course info and join with profiles table for instructor name
+            supabase
+              .from("courses")
+              .select(
+                `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", bio, "avatarUrl")`,
+              )
+              .eq("id", uuid)
+              .single(),
 
-          // Get course info and join with profiles table for instructor name
-          supabase
-            .from("courses")
-            .select(
-              `id, title, description, "startDate", "endDate", "instructorId", profiles:instructorId ("fullName", "bio")`,
-            )
-            .eq("id", uuid)
-            .single(),
+            // Get all quizzes for this course
+            supabase
+              .from("quizzes")
+              .select(`id, title, timeLimit, "dueDate", published`)
+              .eq("courseId", uuid),
 
-          // Get all quizzes for this course
-          supabase
-            .from("quizzes")
-            .select(`id, title, timeLimit, "dueDate", published`)
-            .eq("courseId", uuid),
+            // Get enrolled students
+            supabase
+              .from("enrollments")
+              .select(`student:studentId (id, "fullName", bio, "avatarUrl")`)
+              .eq("courseId", uuid),
 
-          // Get enrolled students
-          supabase
-            .from("enrollments")
-            .select(`student:studentId (id, "fullName", "bio")`)
-            .eq("courseId", uuid),
+            // Get lessons ordered by most recent
+            supabase
+              .from("lessons")
+              .select(
+                `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
+              )
+              .eq("courseId", uuid)
+              .order("uploadedAt", { ascending: false }),
 
-          // Get lessons ordered by most recent
-          supabase
-            .from("lessons")
-            .select(
-              `id, title, "fileName", "fileUrl", "filePath", "uploadedAt", published`,
-            )
-            .eq("courseId", uuid)
-            .order("uploadedAt", { ascending: false }),
-
-          // Get grades only for the current user
-          supabase
-            .from("grades")
-            .select(`score, "studentId", "quizId", "courseId"`)
-            .eq("courseId", uuid)
-            .eq("studentId", user?.id),
-        ]);
+            // Get grades only for the current user
+            supabase
+              .from("grades")
+              .select(`score, "studentId", "quizId", "courseId"`)
+              .eq("courseId", uuid)
+              .eq("studentId", user?.id),
+          ]);
 
         // Error handling for all requests
-        if (profileRes.error) throw profileRes.error;
         if (courseRes.error) throw courseRes.error;
         if (quizRes.error) throw quizRes.error;
         if (enrollmentRes.error) throw enrollmentRes.error;
@@ -225,10 +214,10 @@ function CourseContent({ }: { onClose?: () => void }) {
           endDate?: string | null;
         };
         setProfile({
-          id: raw.id,
-          fullName: raw.profiles?.fullName ?? undefined,
-          bio: raw.profiles?.bio ?? undefined,
-          avatarUrl: raw.profiles?.avatarUrl ?? undefined,
+          id: raw.instructorId ?? "",
+          fullName: raw.profiles?.fullName ?? null,
+          bio: raw.profiles?.bio ?? null,
+          avatarUrl: raw.profiles?.avatarUrl ?? null,
         });
 
         setCourse({
@@ -237,6 +226,7 @@ function CourseContent({ }: { onClose?: () => void }) {
           description: raw.description ?? "",
           instructorId: raw.instructorId ?? "",
           instructor: raw.profiles?.fullName ?? "Unknown Instructor",
+          instructorAvatarUrl: raw.profiles?.avatarUrl ?? null,
           startDate: raw.startDate ?? "",
           endDate: raw.endDate ?? "",
         });
@@ -254,7 +244,13 @@ function CourseContent({ }: { onClose?: () => void }) {
         setStudents(
           (enrollmentRes.data ?? [])
             .map((e: unknown) => (e as { student: Student | null }).student)
-            .filter((s): s is Student => s !== null),
+            .filter((s): s is Student => s !== null)
+            .map((s) => ({
+              id: String(s.id),
+              fullName: s.fullName,
+              avatarUrl: s.avatarUrl ?? null,
+              bio: s.bio ?? null,
+            })),
         );
 
         setLessons(
@@ -598,11 +594,19 @@ function CourseContent({ }: { onClose?: () => void }) {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="rounded-xl bg-white/10 p-2">
-                <UserCircle size={24} />
-              </div>
-              <div className="flex flex-col">
-                <p className=" text-[10px] font-bold uppercase opacity-50">
+              {course.instructorAvatarUrl ? (
+                <img
+                  src={course.instructorAvatarUrl}
+                  alt={`${course.instructor} avatar`}
+                  className="h-10 w-10 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="rounded-xl bg-white/10 p-2">
+                  <UserCircle size={24} />
+                </div>
+              )}
+              <div>
+                <p className="text-[10px] font-bold uppercase opacity-50">
                   Instructor
                 </p>
                 <p className="text-sm font-semibold">{course.instructor}</p>
@@ -669,18 +673,21 @@ function CourseContent({ }: { onClose?: () => void }) {
                     key={s.id}
                     className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-sm font-medium"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
-                      {s.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </div>
-                    <div>
-                      <p>{s.fullName}</p>
-                      {s.bio && (
-                        <p className="text-xs text-zinc-500">{s.bio}</p>
-                      )}
-                    </div>
+                    {s.avatarUrl ? (
+                      <img
+                        src={s.avatarUrl}
+                        alt={`${s.fullName} avatar`}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                        {s.fullName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </div>
+                    )}
+                    {s.fullName}
                   </div>
                 ))}
               </div>

@@ -53,10 +53,11 @@ function SettingsContent() {
 
     const getProfile = async () => {
       setProfileLoading(true);
+      setFormError(null);
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("fullName, role, bio, avatarUrl")
+        .select(`"fullName", role, bio, "avatarUrl"`)
         .eq("id", user.id)
         .maybeSingle();
 
@@ -75,7 +76,19 @@ function SettingsContent() {
     };
 
     getProfile();
-  }, [user?.id, supabase]);
+  }, [user, supabase]);
+
+  // Generates a new random avatar URL using DiceBear
+  function generateRandomAvatar() {
+    if (!user) return;
+
+    setFormSuccess(false);
+    setFormError(null);
+
+    setAvatarUrl(
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}-${Date.now()}`,
+    );
+  }
 
   // Function to handle form submission
   async function saveProfile() {
@@ -105,6 +118,7 @@ function SettingsContent() {
           role,
           bio,
           avatarUrl,
+          updatedAt: new Date().toISOString(),
         },
       ],
       { onConflict: "id" },
@@ -191,22 +205,26 @@ function SettingsContent() {
                     </div>
                   )}
                 </div>
+
                 {/* Button to Generate Avatar */}
                 <button
-                  onClick={() =>
-                    setAvatarUrl(
-                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}-${Date.now()}`,
-                    )
-                  }
+                  type="button"
+                  onClick={generateRandomAvatar}
+                  title="Generate new avatar"
                   className="absolute bottom-1 right-1 rounded-full bg-zinc-900 p-2 text-[#F5F1E6] shadow-xl transition hover:scale-110 active:scale-90"
                 >
                   <Camera size={18} />
                 </button>
               </div>
+
               <div className="text-center sm:text-left">
                 <h2 className="text-2xl font-black">Profile Identity</h2>
-                <p className="text-sm text-zinc-400 font-medium">
+                <p className="text-sm font-medium text-zinc-400">
                   Manage how you appear to others on CourseCanvas.
+                </p>
+                <p className="mt-2 text-xs text-zinc-400">
+                  Click the camera button to generate a new avatar, then save
+                  your changes.
                 </p>
               </div>
             </div>
@@ -214,7 +232,7 @@ function SettingsContent() {
             <div className="grid gap-6">
               {/* Full Name Input */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
+                <label className="ml-1 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
                   <User size={14} /> Legal Name
                 </label>
                 <input
@@ -227,11 +245,11 @@ function SettingsContent() {
 
               {/* Bio Textarea */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
+                <label className="ml-1 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
                   <Info size={14} /> Short Bio
                 </label>
                 <textarea
-                  className="w-full rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 outline-none transition-all focus:border-zinc-900 focus:bg-white focus:ring-4 focus:ring-zinc-900/5 resize-none"
+                  className="w-full resize-none rounded-2xl border border-zinc-100 bg-zinc-50 px-5 py-4 outline-none transition-all focus:border-zinc-900 focus:bg-white focus:ring-4 focus:ring-zinc-900/5"
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Tell us a little about your teaching/learning style..."
@@ -241,7 +259,7 @@ function SettingsContent() {
 
               {/* Role Selection */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
+                <label className="ml-1 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
                   <Users size={14} /> Role
                 </label>
                 <div className="flex gap-3">
@@ -267,10 +285,10 @@ function SettingsContent() {
           {/* Security Section */}
           <section className="rounded-[2.5rem] border border-zinc-200 bg-white p-10 shadow-sm">
             <div className="mb-8">
-              <h2 className="text-2xl font-black flex items-center gap-2">
+              <h2 className="flex items-center gap-2 text-2xl font-black">
                 Security
               </h2>
-              <p className="text-sm text-zinc-400 font-medium">
+              <p className="text-sm font-medium text-zinc-400">
                 Update your credentials to keep your account safe.
               </p>
             </div>
@@ -278,7 +296,7 @@ function SettingsContent() {
             <div className="grid gap-4">
               {/* New Password Input */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400 ml-1">
+                <label className="ml-1 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-zinc-400">
                   <ShieldCheck size={14} /> New Password
                 </label>
                 <input
@@ -289,6 +307,7 @@ function SettingsContent() {
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
               </div>
+
               {/* Confirm Password Input */}
               <input
                 type="password"
@@ -302,12 +321,12 @@ function SettingsContent() {
             {/* Success/Error Notification */}
             <div className="mt-6 min-h-[20px]">
               {formError && (
-                <p className="text-sm font-bold text-red-500 animate-in fade-in slide-in-from-top-1">
+                <p className="animate-in fade-in slide-in-from-top-1 text-sm font-bold text-red-500">
                   {formError}
                 </p>
               )}
               {formSuccess && (
-                <p className="text-sm font-bold text-emerald-600 animate-in fade-in slide-in-from-top-1">
+                <p className="animate-in fade-in slide-in-from-top-1 text-sm font-bold text-emerald-600">
                   Changes saved successfully!
                 </p>
               )}
@@ -319,7 +338,7 @@ function SettingsContent() {
             <button
               onClick={saveProfile}
               disabled={isSaving}
-              className="flex w-full max-w-sm items-center justify-center gap-3 rounded-2xl bg-zinc-900 py-5 font-bold text-[#F5F1E6] shadow-xl shadow-zinc-900/20 transition-all hover:bg-black hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+              className="flex w-full max-w-sm items-center justify-center gap-3 rounded-2xl bg-zinc-900 py-5 font-bold text-[#F5F1E6] shadow-xl shadow-zinc-900/20 transition-all hover:scale-[1.02] hover:bg-black active:scale-95 disabled:opacity-50"
             >
               {isSaving ? (
                 <Loader2 className="animate-spin" size={20} />

@@ -19,6 +19,7 @@ type Course = {
   description: string;
   category: string;
   instructor: string;
+  instructorAvatarUrl?: string | null;
   startDate: string;
   endDate: string;
   isCompleted?: boolean;
@@ -76,9 +77,18 @@ function CertificateModal({
           {/* Instructor and Completion Date */}
           <div className="mb-8 flex justify-center gap-8 text-sm text-zinc-500">
             <div className="flex items-center gap-1.5">
-              <User size={14} className="text-zinc-400" />
+              {course.instructorAvatarUrl ? (
+                <img
+                  src={course.instructorAvatarUrl}
+                  alt={`${course.instructor} avatar`}
+                  className="h-6 w-6 rounded-full object-cover"
+                />
+              ) : (
+                <User size={14} className="text-zinc-400" />
+              )}
               <span>{course.instructor}</span>
             </div>
+
             {course.endDate && (
               <div className="flex items-center gap-1.5">
                 <Calendar size={14} className="text-zinc-400" />
@@ -119,7 +129,6 @@ function CertificateModal({
   );
 }
 
-
 // Main component that renders a grid of courses with actions for enrollment and management.
 export default function CourseCard({
   courses,
@@ -131,7 +140,6 @@ export default function CourseCard({
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   // Track which course certificate is currently being displayed in the modal
   const [certCourse, setCertCourse] = useState<Course | null>(null);
-
 
   // Handles immediate enrollment.
   const handleEnrollClick = (e: React.MouseEvent, courseId: string) => {
@@ -223,9 +231,13 @@ export default function CourseCard({
                         }`}
                       >
                         {isConfirming ? (
-                          <><Check size={14} /> Confirm</>
+                          <>
+                            <Check size={14} /> Confirm
+                          </>
                         ) : (
-                          <><XIcon size={14} /> Remove</>
+                          <>
+                            <XIcon size={14} /> Remove
+                          </>
                         )}
                       </button>
                     </div>
@@ -255,9 +267,13 @@ export default function CourseCard({
                         }`}
                       >
                         {isConfirming ? (
-                          <><Check size={14} /> Confirm</>
+                          <>
+                            <Check size={14} /> Confirm
+                          </>
                         ) : (
-                          <><LogOut size={14} /> Unenroll</>
+                          <>
+                            <LogOut size={14} /> Unenroll
+                          </>
                         )}
                       </button>
                     </div>
@@ -279,7 +295,9 @@ export default function CourseCard({
                   <h2 className="text-2xl font-bold leading-tight text-zinc-800 transition-colors group-hover:text-black">
                     {course.title}
                   </h2>
-                  <span className="text-xs text-zinc-500">{course.category}</span>
+                  <span className="text-xs text-zinc-500">
+                    {course.category}
+                  </span>
                 </div>
 
                 <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-zinc-500">
@@ -291,12 +309,32 @@ export default function CourseCard({
               <div className="mt-8 border-t border-zinc-100 pt-6">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 text-sm text-zinc-700">
-                    <User size={16} className="text-zinc-400" />
-                    <span className="font-medium">{course.instructor}</span>
+                    {course.instructorAvatarUrl ? (
+                      <img
+                        src={course.instructorAvatarUrl}
+                        alt={`${course.instructor} avatar`}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold uppercase text-white">
+                        {course.instructor
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                        Instructor
+                      </p>
+                      <span className="font-medium">{course.instructor}</span>
+                    </div>
                   </div>
+
                   <div className="flex flex-col gap-2 text-sm text-zinc-500">
                     <span className="flex flex-row items-center gap-1">
-                      <Calendar size={16} className="text-zinc-400" /> {" "} Starts{" "}
+                      <Calendar size={16} className="text-zinc-400" /> Starts{" "}
                       {new Date(course.startDate).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -304,7 +342,7 @@ export default function CourseCard({
                       })}
                     </span>
                     <span className="flex flex-row items-center gap-1">
-                      <Calendar size={16} className="text-zinc-400" /> {" "} Ends{" "}
+                      <Calendar size={16} className="text-zinc-400" /> Ends{" "}
                       {new Date(course.endDate).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",

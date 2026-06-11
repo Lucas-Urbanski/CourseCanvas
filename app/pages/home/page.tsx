@@ -16,6 +16,7 @@ type Course = {
   category: string;
   instructor: string;
   instructorId: string;
+  instructorAvatarUrl?: string | null;
   startDate: string;
   endDate: string;
   isCompleted?: boolean;
@@ -112,9 +113,9 @@ function HomeContent() {
       const { data, error } = await supabase
         .from("courses")
         .select(
-          `id, title, description, category, "instructorId", "startDate", "endDate", profiles:instructorId ("fullName")`,
+          `id, title, description, category, "instructorId", "startDate", "endDate", profiles:instructorId ("fullName", "avatarUrl", "avatarUrl")`,
         )
-        .order('"createdAt"', { ascending: false });
+        .order("createdAt", { ascending: false })
 
       if (error) throw error;
 
