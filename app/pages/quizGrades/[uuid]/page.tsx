@@ -77,15 +77,15 @@ function QuizGradesContent() {
         if (studentRes.error) throw studentRes.error;
 
         setGrades(
-          (studentGradeRes.data ?? []).map((g: any) => ({
-            id: String(g.studentId),
-            grade: Number(g.score),
+          (studentGradeRes.data ?? []).map((g: unknown) => ({
+            id: String((g as { studentId: unknown }).studentId),
+            grade: Number((g as { score: unknown }).score),
           })),
         );
 
         setStudents(
           (studentRes.data ?? [])
-            .map((e: any) => e.student as Student | null)
+            .map((e: unknown) => (e as { student: Student | null }).student)
             .filter((s): s is Student => s !== null),
         );
       } catch (err) {

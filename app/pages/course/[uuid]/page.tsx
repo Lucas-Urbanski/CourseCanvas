@@ -71,7 +71,7 @@ type Grade = {
   score: number;
 };
 
-function CourseContent({ onClose }: { onClose?: () => void }) {
+function CourseContent({ }: { onClose?: () => void }) {
   // Extract the course UUID from the URL parameters
   const params = useParams<{ uuid: string | string[] }>();
   const uuid = Array.isArray(params.uuid) ? params.uuid[0] : params.uuid;
@@ -211,12 +211,24 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
 
         // Map raw database data to our defined types
 
-        const raw = courseRes.data as any;
+        const raw = courseRes.data as {
+          id: string;
+          title: string;
+          description?: string | null;
+          instructorId?: string | null;
+          profiles?: {
+            fullName?: string | null;
+            bio?: string | null;
+            avatarUrl?: string | null;
+          };
+          startDate?: string | null;
+          endDate?: string | null;
+        };
         setProfile({
           id: raw.id,
-          fullName: raw.profiles?.fullName,
-          bio: raw.profiles?.bio,
-          avatarUrl: raw.profiles?.avatarUrl,
+          fullName: raw.profiles?.fullName ?? undefined,
+          bio: raw.profiles?.bio ?? undefined,
+          avatarUrl: raw.profiles?.avatarUrl ?? undefined,
         });
 
         setCourse({
@@ -230,38 +242,38 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
         });
 
         setQuizzes(
-          (quizRes.data ?? []).map((q: any) => ({
-            id: String(q.id),
-            title: q.title,
-            dueDate: q.dueDate ?? "",
-            timeLimit: q.timeLimit ?? 10000,
-            published: q.published ?? false,
+          (quizRes.data ?? []).map((q: unknown) => ({
+            id: String((q as { id: string }).id),
+            title: (q as { title: string }).title,
+            dueDate: (q as { dueDate: string }).dueDate ?? "",
+            timeLimit: (q as { timeLimit: number }).timeLimit ?? 10000,
+            published: (q as { published: boolean }).published ?? false,
           })),
         );
 
         setStudents(
           (enrollmentRes.data ?? [])
-            .map((e: any) => e.student as Student | null)
+            .map((e: unknown) => (e as { student: Student | null }).student)
             .filter((s): s is Student => s !== null),
         );
 
         setLessons(
-          (lessonsRes.data ?? []).map((l: any) => ({
-            id: String(l.id),
-            title: l.title,
-            fileName: l.fileName,
-            fileUrl: l.fileUrl,
-            filePath: l.filePath,
-            published: l.published ?? false,
+          (lessonsRes.data ?? []).map((l: unknown) => ({
+            id: String((l as { id: string }).id),
+            title: (l as { title: string }).title,
+            fileName: (l as { fileName: string }).fileName,
+            fileUrl: (l as { fileUrl: string }).fileUrl,
+            filePath: (l as { filePath: string }).filePath,
+            published: (l as { published: boolean }).published ?? false,
           })),
         );
 
         setGrades(
-          (gradeRes.data ?? []).map((g: any) => ({
-            studentId: g.studentId,
-            quizId: g.quizId,
-            courseId: g.courseId,
-            score: g.score,
+          (gradeRes.data ?? []).map((g: unknown) => ({
+            studentId: (g as { studentId: string }).studentId,
+            quizId: (g as { quizId: string }).quizId,
+            courseId: (g as { courseId: string }).courseId,
+            score: (g as { score: number }).score,
           })),
         );
       } catch (err) {
@@ -336,12 +348,12 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
 
       // Update local state to show the new lesson immediately
       setLessons((prev) => [
-        { ...(inserted as Lesson), id: String((inserted as any).id) },
+        { ...(inserted as Lesson), id: String((inserted as { id: string }).id) },
         ...prev,
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Upload failed:", err);
-      setActionError(err.message || "Upload failed.");
+      setActionError((err as Error).message || "Upload failed.");
     } finally {
       setUploading(false);
 
@@ -395,9 +407,9 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
 
         setLessons((prev) => prev.filter((l) => l.id !== lesson.id));
         setPendingDeleteLesson(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Delete failed:", err);
-        setActionError(err.message || "Delete failed.");
+        setActionError((err as Error).message || "Delete failed.");
       } finally {
         setDeletingLessonId(null);
       }
@@ -420,8 +432,8 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
           l.id === lesson.id ? { ...l, published: !l.published } : l,
         ),
       );
-    } catch (err: any) {
-      setActionError(err.message || "Failed to update lesson.");
+    } catch (err: unknown) {
+      setActionError((err as Error).message || "Failed to update lesson.");
     }
   };
 
@@ -459,9 +471,9 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
           throw new Error(`Database delete failed: ${dbError.message}`);
 
         setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Delete failed:", err);
-        setActionError(err.message || "Delete failed.");
+        setActionError((err as Error).message || "Delete failed.");
       } finally {
         setDeletingQuizId(null);
       }
@@ -485,8 +497,8 @@ function CourseContent({ onClose }: { onClose?: () => void }) {
           q.id === quiz.id ? { ...q, published: !q.published } : q,
         ),
       );
-    } catch (err: any) {
-      setActionError(err.message || "Failed to update quiz.");
+    } catch (err: unknown) {
+      setActionError((err as Error).message || "Failed to update quiz.");
     }
   };
 

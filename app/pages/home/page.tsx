@@ -59,7 +59,7 @@ function HomeContent() {
 
   // Completion Logic: A course is complete if the student has a grade for every published quiz in that course.
   const computeCompletedIds = useCallback(
-    async function (_rawCourses: any[],
+    async function (_rawCourses: unknown[],
     courseIdsToCheck: string[]): Promise<Set<string>> {
     if (courseIdsToCheck.length === 0) return new Set();
 
@@ -78,14 +78,17 @@ function HomeContent() {
     ]);
 
     const gradedQuizScores = new Map<string, number>(
-      (gradeData ?? []).map((g: any) => [g.quizId, g.score])
+      (gradeData ?? []).map((g: unknown) => [
+        (g as { quizId: string }).quizId,
+        (g as { score: number }).score,
+      ])
     );
 
     return new Set(
       courseIdsToCheck.filter((courseId) => {
         const quizIds = (quizData ?? [])
-          .filter((q: any) => q.courseId === courseId)
-          .map((q: any) => q.id);
+          .filter((q: unknown) => (q as { courseId: string }).courseId === courseId)
+          .map((q: unknown) => (q as { id: string }).id);
         // Return true only if quizzes exist and every quiz ID is found in the student's grades and has a passing grade.
         return (
           quizIds.length > 0 &&
@@ -124,19 +127,20 @@ function HomeContent() {
 
         if (enrollError) throw enrollError;
 
-        let enrolledIds = (enrollments ?? []).map((e: any) => e.courseId);
+        let enrolledIds = (enrollments ?? []).map((e: unknown) => (e as { courseId: string }).courseId);
 
         // Filter for courses that have passed their end date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const allPastCourseIds = (data ?? [])
-          .filter((c: any) => {
-            if (!c.endDate) return false;
-            const ended = new Date(c.endDate);
+          .filter((c: unknown) => {
+            const course = c as { endDate: string };
+            if (!course.endDate) return false;
+            const ended = new Date(course.endDate);
             ended.setHours(0, 0, 0, 0);
             return ended < today;
           })
-          .map((c: any) => c.id);
+          .map((c: unknown) => (c as { id: string }).id);
 
         const completedIds = await computeCompletedIds(
           data ?? [],
@@ -160,16 +164,16 @@ function HomeContent() {
         }
 
         // Map raw database data to the Course type
-        const mapped: Course[] = (data ?? []).map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          description: c.description ?? "",
-          category: c.category ?? "",
-          instructor: c.profiles?.fullName ?? "Unknown",
-          instructorId: c.instructorId ?? "",
-          startDate: c.startDate ?? "",
-          endDate: c.endDate ?? "",
-          isCompleted: completedIds.has(c.id),
+        const mapped: Course[] = (data ?? []).map((c: unknown) => ({
+          id: (c as { id: string }).id,
+          title: (c as { title: string }).title,
+          description: (c as { description: string }).description ?? "",
+          category: (c as { category: string }).category ?? "",
+          instructor: (c as { profiles: { fullName: string } }).profiles?.fullName ?? "Unknown",
+          instructorId: (c as { instructorId: string }).instructorId ?? "",
+          startDate: (c as { startDate: string }).startDate ?? "",
+          endDate: (c as { endDate: string }).endDate ?? "",
+          isCompleted: completedIds.has((c as { id: string }).id),
         }));
 
         setEnrolledCourseIds(new Set(enrolledIds));
@@ -178,21 +182,21 @@ function HomeContent() {
       } else {
         // Teacher logic: Just map the courses without enrollment checks
         setCourses(
-          (data ?? []).map((c: any) => ({
-            id: c.id,
-            title: c.title,
-            description: c.description ?? "",
-            category: c.category ?? "",
-            instructor: c.profiles?.fullName ?? "Unknown",
-            instructorId: c.instructorId ?? "",
-            startDate: c.startDate ?? "",
-            endDate: c.endDate ?? "",
+          (data ?? []).map((c: unknown) => ({
+            id: (c as { id: string }).id,
+            title: (c as { title: string }).title,
+            description: (c as { description: string }).description ?? "",
+            category: (c as { category: string }).category ?? "",
+            instructor: (c as { profiles: { fullName: string } }).profiles?.fullName ?? "Unknown",
+            instructorId: (c as { instructorId: string }).instructorId ?? "",
+            startDate: (c as { startDate: string }).startDate ?? "",
+            endDate: (c as { endDate: string }).endDate ?? "",
           })),
         );
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch courses:", err);
-      setCoursesError(err?.message || "Failed to load courses.");
+      setCoursesError((err as Error)?.message || "Failed to load courses.");
     } finally {
       setCoursesLoading(false);
     }
@@ -227,23 +231,23 @@ function HomeContent() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const allPastCourseIds = courses
-        .filter((c) => {
-          if (!c.endDate) return false;
-          const ended = new Date(c.endDate);
+        .filter((c: unknown) => {
+          if (! (c as { endDate: string }).endDate) return false;
+          const ended = new Date((c as { endDate: string }).endDate);
           ended.setHours(0, 0, 0, 0);
           return ended < today;
         })
-        .map((c) => c.id);
+        .map((c: unknown) => (c as { id: string }).id);
       const completedIds = await computeCompletedIds(courses, allPastCourseIds);
 
       setEnrolledCourseIds(new Set(newEnrolledIds));
       setCourses((prev) =>
-        prev.map((c) => ({ ...c, isCompleted: completedIds.has(c.id) })),
+        prev.map((c) => ({ ...c, isCompleted: completedIds.has((c as { id: string }).id) })),
       );
       setActionSuccess("Successfully enrolled!");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Enrollment error:", err);
-      setActionError(err.message || "Failed to enroll.");
+      setActionError((err as Error).message || "Failed to enroll.");
     }
   };
 
@@ -267,9 +271,9 @@ function HomeContent() {
       // Update state locally for immediate UI feedback
       setEnrolledCourseIds(new Set(newEnrolledIds));
       setActionSuccess("Successfully unenrolled.");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Unenroll error:", err);
-      setActionError(err.message || "Failed to unenroll.");
+      setActionError((err as Error).message || "Failed to unenroll.");
     }
   };
 
@@ -292,9 +296,9 @@ function HomeContent() {
         .eq("id", courseId);
       if (error) throw error;
       setCourses((prev) => prev.filter((c) => c.id !== courseId));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Delete error:", err);
-      setActionError(err.message || "Failed to delete course.");
+      setActionError((err as Error).message || "Failed to delete course.");
     }
   };
 

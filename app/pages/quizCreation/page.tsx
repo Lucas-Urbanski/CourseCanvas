@@ -105,17 +105,18 @@ function QuizCreationContent() {
         const restoredAnswers: Record<number, QuestionChoice> = {};
         const strippedQuestions: Question[] = fetchedQuestions.map((q) => {
           if (q.correctAnswer) restoredAnswers[q.id] = q.correctAnswer;
-          const { correctAnswer: _, ...rest } = q;
-          return rest;
+          const rest = { ...q } as { correctAnswer?: QuestionChoice };
+          delete rest.correctAnswer;
+          return rest as Question;
         });
 
         setTitle(data.title ?? "");
         setDueDate(data.dueDate ?? "");
         setQuestions(strippedQuestions);
         setAnswers(restoredAnswers);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error loading quiz:", err);
-        setError(err?.message ?? "Failed to load quiz.");
+        setError((err as Error)?.message ?? "Failed to load quiz.");
       } finally {
         setIsFetching(false);
       }
@@ -248,9 +249,9 @@ function QuizCreationContent() {
       }
 
       router.push(`/pages/course/${courseId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error saving quiz:", err);
-      setError(err?.message ?? "Failed to save quiz.");
+      setError((err as Error)?.message ?? "Failed to save quiz.");
     } finally {
       setIsLoading(false);
     }
