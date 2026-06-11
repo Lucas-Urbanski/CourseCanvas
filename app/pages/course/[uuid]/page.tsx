@@ -688,12 +688,14 @@ function CourseContent({ }: { onClose?: () => void }) {
                       </div>
                     )}
                     {s.fullName}
+                    {s.bio && (
                       <div className="flex flex-col gap-1">
                         <p className="text-[10px] font-bold uppercase opacity-50">
                           Bio
                         </p>
                         <p className="text-xs opacity-80"> {s.bio}</p>
                       </div>
+                    )}
                   </div>
                 ))}
               </div>
