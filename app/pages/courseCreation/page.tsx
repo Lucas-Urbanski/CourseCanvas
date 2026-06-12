@@ -13,6 +13,7 @@ import {
   Type,
   Tag,
   Save,
+  ArrowLeft,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useAuth } from "../../context/AuthContext";
@@ -193,6 +194,14 @@ function CourseCreationContent() {
 
       <main className="flex flex-1 flex-col items-center px-6 py-16">
         <div className="w-full max-w-2xl rounded-3xl border border-zinc-200 bg-white p-10 shadow-xl shadow-zinc-200/50">
+          {isEditMode &&
+          <div className="mb-4 w-18">
+            <Link href={`/pages/course/${courseId}`} className="flex col gap-2">
+              <ArrowLeft/>
+              <h2 className="text-zinc-900">Back</h2>
+            </Link>
+          </div>
+          }
           <div className="mb-10">
             <h2 className="mb-2 text-3xl font-black text-zinc-900">
               {isEditMode ? "Edit Course" : "Create a Course"}
