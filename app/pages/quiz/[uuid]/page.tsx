@@ -119,7 +119,7 @@ function QuizContent() {
             console.error("INSERT ATTEMPT ERROR:", insertAttemptError);
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error fetching quiz:", error);
         setQuiz(null);
       } finally {
@@ -200,8 +200,8 @@ function QuizContent() {
       if (attemptUpdateError) throw attemptUpdateError;
 
       return true;
-    } catch (error: any) {
-      alert(error.message ?? "Error submitting quiz");
+    } catch (error: unknown) {
+      alert((error as Error).message ?? "Error submitting quiz");
       console.error("Error submitting quiz:", error);
       return false;
     }
