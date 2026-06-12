@@ -4,7 +4,7 @@ import AuthGuard from "@/app/components/AuthGuard";
 import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { BookOpen, Settings } from "lucide-react";
+import { BookOpen, Settings, ArrowLeft } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 type StudentGrade = {
@@ -54,6 +54,7 @@ function QuizGradesContent() {
 
   const [grades, setGrades] = useState<StudentGrade[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [course, setCourse] = useState();
   useEffect(() => {
     if (!uuid) return;
 
@@ -67,6 +68,7 @@ function QuizGradesContent() {
         if (quizError) throw quizError;
 
         const courseId = quizData.courseId;
+        setCourse(courseId);
         const [studentGradeRes, studentRes] = await Promise.all([
           supabase.from("grades").select(`score, studentId`).eq("quizId", uuid),
           supabase
@@ -142,6 +144,12 @@ function QuizGradesContent() {
 
       <main className="mx-auto w-full max-w-3xl space-y-6 px-6 py-10">
         {/* Summary Stats */}
+        <div className="mb-4 w-18">
+            <Link href={`/pages/course/${course}`} className="flex col gap-2">
+              <ArrowLeft/>
+              <h2 className="text-zinc-900">Back</h2>
+            </Link>
+          </div>
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: "Students", value: students.length || "—" },

@@ -12,6 +12,7 @@ import {
   Settings,
   Trash2,
   Type,
+  ArrowLeft,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -311,6 +312,12 @@ function QuizCreationContent() {
 
         {/* Metadata */}
         <section className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
+          <div className="mb-4 w-18">
+            <Link href={`/pages/course/${courseId}`} className="flex col gap-2">
+              <ArrowLeft/>
+              <h2 className="text-zinc-900">Back</h2>
+            </Link>
+          </div>
           <div className="grid gap-8 md:grid-cols-2">
             <div className="space-y-2">
               <label className="ml-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
